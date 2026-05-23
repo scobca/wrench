@@ -106,6 +106,7 @@ Variants:
     - [djb2_hash](#djb2_hash)
     - [fnv32_1_hash](#fnv32_1_hash)
     - [fnv32_1a_hash](#fnv32_1a_hash)
+    - [linear_filter](#linear_filter)
 - _Examples_
     - [dup](#dup)
     - [factorial](#factorial)
@@ -1642,6 +1643,37 @@ def fnv32_1a_hash(xs):
 assert fnv32_1a_hash('a\0') == 3826002220
 assert fnv32_1a_hash('abc\0') == 440920331
 assert fnv32_1a_hash('Computers are awesome!\0') == 4243580747
+```
+
+### `linear_filter`
+
+```python
+def linear_filter(*xs):
+    """
+    Input: first word N (length of array), then N values of X.
+    Output: N values of Y where Y[i] = 3*X[i] + 2*X[i-1] + X[i-2]
+    with X[-1] = X[-2] = 0
+    (so Y[0] = 3*X[0], Y[1] = 3*X[1] + 2*X[0]).
+    """
+    n = xs[0]
+    x = list(xs[1 : n + 1])
+
+    result = []
+    for i in range(n):
+        x_i = x[i]
+        x_i1 = x[i - 1] if i >= 1 else 0
+        x_i2 = x[i - 2] if i >= 2 else 0
+        y_i = 3 * x_i + 2 * x_i1 + x_i2
+        result.append(y_i)
+
+    return result
+
+
+assert linear_filter(0) == []
+assert linear_filter(1, 5) == [15]
+assert linear_filter(2, 5, 10) == [15, 40]
+assert linear_filter(3, 1, 2, 3) == [3, 8, 14]
+assert linear_filter(5, 1, 2, 3, 4, 5) == [3, 8, 14, 20, 26]
 ```
 
 ## _Examples_
