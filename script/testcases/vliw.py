@@ -140,3 +140,48 @@ TEST_CASES["determinant_3x3"] = TestCase(
     is_variant=True,
     category="VLIW",
 )
+
+
+###########################################################
+
+
+def linear_filter(*xs):
+    """
+    Input: first word N (length of array), then N values of X.
+    Output: N values of Y where Y[i] = 3*X[i] + 2*X[i-1] + X[i-2]
+    with X[-1] = X[-2] = 0
+    (so Y[0] = 3*X[0], Y[1] = 3*X[1] + 2*X[0]).
+    """
+    n = xs[0]
+    x = list(xs[1 : n + 1])
+
+    result = []
+    for i in range(n):
+        x_i = x[i]
+        x_i1 = x[i - 1] if i >= 1 else 0
+        x_i2 = x[i - 2] if i >= 2 else 0
+        y_i = 3 * x_i + 2 * x_i1 + x_i2
+        result.append(y_i)
+
+    return result
+
+
+TEST_CASES["linear_filter"] = TestCase(
+    simple=linear_filter,
+    cases=[
+        Words2Words([0], []),
+        Words2Words([1, 5], [15]),
+        Words2Words([2, 5, 10], [15, 40]),
+        Words2Words([3, 1, 2, 3], [3, 8, 14]),
+        Words2Words([5, 1, 2, 3, 4, 5], [3, 8, 14, 20, 26]),
+    ],
+    reference=linear_filter,
+    reference_cases=[
+        Words2Words([3, 10, 20, 30], [30, 80, 140]),
+        Words2Words([4, 100, 0, 100, 0], [300, 200, 400, 200]),
+        Words2Words([6, 1, 1, 1, 1, 1, 1], [3, 5, 6, 6, 6, 6]),
+        Words2Words([2, -5, 10], [-15, 20]),
+    ],
+    is_variant=True,
+    category="VLIW",
+)
