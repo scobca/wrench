@@ -185,3 +185,217 @@ TEST_CASES["linear_filter"] = TestCase(
     is_variant=True,
     category="VLIW",
 )
+
+
+###########################################################
+
+
+def sdbm_hash(xs):
+    """Input: stream of chars forming c string style (end with 0)
+
+    Need to calculate SDBM 32 bit hash of input string.
+    """
+    it = 0
+    hash_value = 0
+    while ord(xs[it]) > 0:
+        c = ord(xs[it])
+        hash_value = (
+            c + (hash_value << 6) + (hash_value << 16) - hash_value
+        ) & 0xFFFFFFFF
+        it += 1
+
+    return hash_value
+
+
+TEST_CASES["sdbm_hash"] = TestCase(
+    simple=sdbm_hash,
+    cases=[
+        CharSequence2Word("\0", 0x00000000),
+        CharSequence2Word("a\0", 0x00000061),
+        CharSequence2Word("abc\0", 0x3025F862),
+        CharSequence2Word("Computers are awesome!\0", 0x04B79E52),
+    ],
+    reference=sdbm_hash,
+    reference_cases=[],
+    is_variant=True,
+    category="VLIW",
+)
+
+
+###########################################################
+
+
+def affine2d_transform(*xs):
+    """Input: first word N, then N pairs: x, y.
+
+    Output for every pair: u = 3*x + 2*y + 5, v = -x + 4*y - 7.
+    """
+    n = xs[0]
+    if n < 0:
+        return [-1]
+
+    result = []
+    for i in range(n):
+        x = xs[1 + 2 * i]
+        y = xs[2 + 2 * i]
+        u = 3 * x + 2 * y + 5
+        v = -x + 4 * y - 7
+        if (
+            u < -0x80000000
+            or u > 0x7FFFFFFF
+            or v < -0x80000000
+            or v > 0x7FFFFFFF
+        ):
+            return [0xCCCCCCCC]
+        result.extend([u, v])
+
+    return result
+
+
+TEST_CASES["affine2d_transform"] = TestCase(
+    simple=affine2d_transform,
+    cases=[
+        Words2Words([0], []),
+        Words2Words([1, 1, 2], [12, 0]),
+        Words2Words([2, 0, 0, 3, -1], [5, -7, 12, -14]),
+        Words2Words([3, -2, 5, 10, 0, -1, -1], [9, 15, 35, -17, 0, -10]),
+    ],
+    reference=affine2d_transform,
+    reference_cases=[
+        Words2Words([-1], [-1]),
+        Words2Words([1, 1000000000, 1000000000], [0xCCCCCCCC]),
+    ],
+    is_variant=True,
+    category="VLIW",
+)
+
+
+###########################################################
+
+
+def sum_and_sum_squares(*xs):
+    """Input: first word N, then N values.
+
+    Output: two words: sum(X) and sum(x*x for x in X).
+    """
+    n = xs[0]
+    if n < 0:
+        return [-1]
+
+    total = 0
+    square_total = 0
+    for i in range(n):
+        x = xs[1 + i]
+        total += x
+        square_total += x * x
+
+    if (
+        total < -0x80000000
+        or total > 0x7FFFFFFF
+        or square_total < -0x80000000
+        or square_total > 0x7FFFFFFF
+    ):
+        return [0xCCCCCCCC]
+
+    return [total, square_total]
+
+
+TEST_CASES["sum_and_sum_squares"] = TestCase(
+    simple=sum_and_sum_squares,
+    cases=[
+        Words2Words([0], [0, 0]),
+        Words2Words([3, 1, 2, 3], [6, 14]),
+        Words2Words([4, -2, 5, 0, -3], [0, 38]),
+        Words2Words([5, 10, 20, 30, 40, 50], [150, 5500]),
+    ],
+    reference=sum_and_sum_squares,
+    reference_cases=[
+        Words2Words([-1], [-1]),
+        Words2Words([2, 50000, 50000], [0xCCCCCCCC]),
+    ],
+    is_variant=True,
+    category="VLIW",
+)
+
+
+###########################################################
+
+
+def determinant_2x2_stream(*xs):
+    """Input: first word N, then N matrices: a, b, c, d.
+
+    Output: N values of determinant where det = a*d - b*c.
+    """
+    n = xs[0]
+    if n < 0:
+        return [-1]
+
+    result = []
+    for i in range(n):
+        base = 1 + 4 * i
+        a, b, c, d = xs[base : base + 4]
+        det = a * d - b * c
+        if det < -0x80000000 or det > 0x7FFFFFFF:
+            return [0xCCCCCCCC]
+        result.append(det)
+
+    return result
+
+
+TEST_CASES["determinant_2x2_stream"] = TestCase(
+    simple=determinant_2x2_stream,
+    cases=[
+        Words2Words([0], []),
+        Words2Words([1, 1, 2, 3, 4], [-2]),
+        Words2Words([2, 1, 0, 0, 1, 2, 3, 5, 7], [1, -1]),
+        Words2Words([3, 0, 0, 0, 0, -1, 2, 3, -4, 7, -5, 4, 8], [0, -2, 76]),
+    ],
+    reference=determinant_2x2_stream,
+    reference_cases=[
+        Words2Words([-1], [-1]),
+        Words2Words([1, 50000, 0, 0, 50000], [0xCCCCCCCC]),
+    ],
+    is_variant=True,
+    category="VLIW",
+)
+
+
+###########################################################
+
+
+def complex_multiply(*xs):
+    """Input: four words: a, b, c, d.
+
+    Need to multiply two complex numbers: (a + b*i) * (c + d*i).
+    Output: real and imaginary parts.
+    """
+    a, b, c, d = xs
+    real = a * c - b * d
+    imag = a * d + b * c
+
+    if (
+        real < -0x80000000
+        or real > 0x7FFFFFFF
+        or imag < -0x80000000
+        or imag > 0x7FFFFFFF
+    ):
+        return [0xCCCCCCCC]
+
+    return [real, imag]
+
+
+TEST_CASES["complex_multiply"] = TestCase(
+    simple=complex_multiply,
+    cases=[
+        Words2Words([1, 2, 3, 4], [-5, 10]),
+        Words2Words([0, 0, 5, -7], [0, 0]),
+        Words2Words([-1, 2, 3, -4], [5, 10]),
+        Words2Words([123, 456, 7, 8], [-2787, 4176]),
+    ],
+    reference=complex_multiply,
+    reference_cases=[
+        Words2Words([50000, 50000, 50000, 50000], [0xCCCCCCCC]),
+    ],
+    is_variant=True,
+    category="VLIW",
+)
