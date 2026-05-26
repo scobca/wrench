@@ -17,7 +17,7 @@ import Numeric (showHex)
 import Relude
 import Servant
 import Servant.HTML.Lucid (HTML)
-import System.Directory (doesFileExist, listDirectory)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, listDirectory)
 import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (takeBaseName, takeFileName, (</>))
 import Wrench.Misc (wrenchVersion)
@@ -44,6 +44,7 @@ main = do
     hSetBuffering stdout NoBuffering
     conf@Config{cPort} <- initConfig
     print $ mask conf
+    syncExamples conf
     putStrLn $ "Starting server on port " <> show cPort
     run cPort (logStdoutDev $ app conf)
 
@@ -54,6 +55,7 @@ type API =
     "submit-form" :> GetForm
         :<|> "submit" :> SubmitForm
         :<|> "report" :> GetReport
+        :<|> "examples" :> GetExamples
         :<|> "assets" :> Raw
         :<|> Get '[JSON] (Headers '[Header "Location" Text] NoContent)
 
@@ -62,6 +64,7 @@ server conf =
     getForm conf
         :<|> submitForm conf
         :<|> getReport conf
+        :<|> getExamples conf
         :<|> serveDirectoryWebApp "static/assets"
         :<|> redirectToForm
 
@@ -241,6 +244,66 @@ versionWarning reportVer
     | reportVer == wrenchVersion = ""
     | otherwise =
         " <span class=\"text-[var(--c-orange)]\">[WARNING: current wrench version is " <> escapeHtml wrenchVersion <> "]</span>"
+
+type GetExamples = Get '[HTML] (Html ())
+
+getExamples :: Config -> Handler (Html ())
+getExamples _ = do
+    let path = "static/examples.html"
+    exists <- liftIO (doesFileExist path)
+    template <-
+        if exists
+            then liftIO (decodeUtf8 <$> readFileBS path)
+            else return placeholderExamplesPage
+    let rendered =
+            foldl'
+                (\st (pat, new) -> replace pat new st)
+                template
+                [ ("{{tracker}}", postHogTracker)
+                , ("{{version}}", wrenchVersion)
+                ]
+    return $ toHtmlRaw rendered
+
+placeholderExamplesPage :: Text
+placeholderExamplesPage =
+    T.unlines
+        [ "<!doctype html><html><body style=\"background:#1a1a1a;color:#eee;font-family:monospace;padding:2em\">"
+        , "<h1>Wrench Examples</h1>"
+        , "<p>Examples have not been built for this deployment.</p>"
+        , "<p>Run <code>script/build_examples.py</code> during the docker image build to pre-render reports.</p>"
+        , "<p><a style=\"color:#7fa\" href=\"/\">[submit]</a></p>"
+        , "</body></html>"
+        ]
+
+syncExamples :: Config -> IO ()
+syncExamples Config{cExamplesPath, cStoragePath} = do
+    exists <- doesDirectoryExist cExamplesPath
+    if not exists
+        then putStrLn $ "No bundled examples found at " <> cExamplesPath <> ", skipping sync."
+        else do
+            createDirectoryIfMissing True cStoragePath
+            entries <- listDirectory cExamplesPath
+            reportDirs <- filterM (doesDirectoryExist . (cExamplesPath </>)) entries
+            putStrLn
+                $ "Syncing "
+                <> show (length reportDirs)
+                <> " example report(s) from "
+                <> cExamplesPath
+                <> " to "
+                <> cStoragePath
+            forM_ reportDirs $ \name -> copyDirRecursive (cExamplesPath </> name) (cStoragePath </> name)
+
+copyDirRecursive :: FilePath -> FilePath -> IO ()
+copyDirRecursive src dst = do
+    createDirectoryIfMissing True dst
+    entries <- listDirectory src
+    forM_ entries $ \entry -> do
+        let from = src </> entry
+            to = dst </> entry
+        isDir <- doesDirectoryExist from
+        if isDir
+            then copyDirRecursive from to
+            else readFileBS from >>= writeFileBS to
 
 redirectToForm :: Handler (Headers '[Header "Location" Text] NoContent)
 redirectToForm = throwError $ err301{errHeaders = [("Location", "/submit-form")]}

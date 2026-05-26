@@ -13,3 +13,5 @@ src/wrench/Main
 tmp.s
 tmp.yaml
 *.prof
+build/
+static/examples.html
