@@ -1,3 +1,5 @@
+# Example programs
+
 ## Naming convention
 
 An example is a pair of files in the same folder:
