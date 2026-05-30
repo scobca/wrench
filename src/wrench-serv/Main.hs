@@ -259,10 +259,14 @@ instance FromJSON ExampleEntry where
     parseJSON =
         withObject "ExampleEntry" $ \o ->
             ExampleEntry
-                <$> o .: "guid"
-                <*> o .: "isa"
-                <*> o .: "name"
-                <*> o .: "ok"
+                <$> o
+                .: "guid"
+                <*> o
+                .: "isa"
+                <*> o
+                .: "name"
+                <*> o
+                .: "ok"
 
 getExamples :: Config -> Handler (Html ())
 getExamples Config{cExamplesPath} = do
