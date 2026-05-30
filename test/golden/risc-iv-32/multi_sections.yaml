@@ -1,0 +1,30 @@
+limit: 200
+memory_size: 0x300
+memory_mapped_io:
+  0x80: [7]
+  0x84: []
+reports:
+  - name: result
+    slice: last
+    view: |
+      numio[0x80]: {io:0x80:dec}
+      numio[0x84]: {io:0x84:dec}
+    assert: |
+      numio[0x80]: [] >>> []
+      numio[0x84]: [] >>> [7]
+  - name: stats
+    slice: last
+    view: |
+      sections: {layout:sections}
+      text: {layout:text-sections}
+      data: {layout:data-sections}
+      mem-instr: {mem:instr-range}
+      mem-data: {mem:data-range}
+      mem-io: {mem:io-range}
+    assert: |
+      sections: 76
+      text: 68
+      data: 8
+      mem-instr: 0..35, 44..71
+      mem-data: 40..43, 72..75, 508..511
+      mem-io: 128..135
