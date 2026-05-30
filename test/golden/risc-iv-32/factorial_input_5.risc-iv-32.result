@@ -91,3 +91,6 @@ numio[0x84]: [] >>> [120]
 ---
 # stats
 instructions: 42
+sections: 128
+text: 120
+data: 8

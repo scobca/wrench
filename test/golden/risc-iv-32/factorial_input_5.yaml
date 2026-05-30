@@ -21,5 +21,11 @@ reports:
     slice: last
     view: |
       instructions: {sim:instruction-count}
+      sections: {layout:sections}
+      text: {layout:text-sections}
+      data: {layout:data-sections}
     assert: |
       instructions: 42
+      sections: 128
+      text: 120
+      data: 8
