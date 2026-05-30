@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import annotations
 
 import argparse
@@ -42,6 +41,10 @@ class Example:
         return f"example/{self.isa}/{self.config}"
 
     @property
+    def meta_path(self) -> Path:
+        return self.example_root / self.isa / (Path(self.config).stem + ".meta.json")
+
+    @property
     def guid(self) -> uuid.UUID:
         key = f"wrench-example:{self.isa}/{self.source}+{self.config}"
         return uuid.uuid5(EXAMPLES_NAMESPACE, key)
@@ -78,6 +81,33 @@ def discover_examples(example_root: Path) -> list[Example]:
             for y in sorted(matched):
                 examples.append(Example(isa_dir, s, y, example_root))
     return examples
+
+
+def load_meta(ex: Example) -> tuple[str, str]:
+    title = ex.display_name
+    description = ""
+    if ex.meta_path.is_file():
+        data = json.loads(ex.meta_path.read_text(encoding="utf-8"))
+        title = str(data.get("title") or title)
+        description = str(data.get("description") or "")
+    return title, description
+
+
+def find_unpaired(example_root: Path, examples: list[Example]) -> list[str]:
+    used_sources = {(e.isa, e.source) for e in examples}
+    used_configs = {(e.isa, e.config) for e in examples}
+    unpaired: list[str] = []
+    if not example_root.is_dir():
+        return unpaired
+
+    for isa_dir in sorted(p.name for p in example_root.iterdir() if p.is_dir()):
+        d = example_root / isa_dir
+        for p in sorted(d.iterdir()):
+            if p.suffix == ".s" and (isa_dir, p.name) not in used_sources:
+                unpaired.append(f"{isa_dir}/{p.name}")
+            elif p.suffix == ".yaml" and (isa_dir, p.name) not in used_configs:
+                unpaired.append(f"{isa_dir}/{p.name}")
+    return unpaired
 
 
 def wrench_cmd(wrench: str) -> list[str]:
@@ -128,7 +158,13 @@ def render_status_log(
 
 
 def build_one_example(
-    ex: Example, *, storage_dir: Path, wrench: str, version: str, log_limit: int
+    ex: Example,
+    *,
+    storage_dir: Path,
+    wrench: str,
+    version: str,
+    log_limit: int,
+    description: str = "",
 ) -> bool:
     isa = ex.isa
     out_dir = storage_dir / str(ex.guid)
@@ -137,18 +173,18 @@ def build_one_example(
     shutil.copyfile(ex.source_path, out_dir / "source.s")
     shutil.copyfile(ex.config_path, out_dir / "config.yaml")
 
+    comment_lines: list[str] = []
+    if description:
+        comment_lines += [description, ""]
+    comment_lines += [
+        f"Source: {ex.repo_path}",
+        f"Config: {ex.repo_config}",
+        f"ISA:    {isa}",
+    ]
+
     (out_dir / "name.txt").write_text("wrench")
     (out_dir / "variant.txt").write_text(f"example {ex.display_name}", encoding="utf-8")
-    (out_dir / "comment.txt").write_text(
-        "\n".join(
-            [
-                f"Source: {ex.repo_path}",
-                f"Config: {ex.repo_config}",
-                f"ISA:    {isa}",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    (out_dir / "comment.txt").write_text("\n".join(comment_lines), encoding="utf-8")
     (out_dir / "wrench-version.txt").write_text(version, encoding="utf-8")
     (out_dir / "test_cases_status.log").write_text("", encoding="utf-8")
     (out_dir / "test_cases_result.log").write_text("", encoding="utf-8")
@@ -208,18 +244,21 @@ def main(argv: list[str]) -> int:
     index: list[dict[str, object]] = []
     failed: list[Example] = []
     for ex in examples:
+        title, description = load_meta(ex)
         ok = build_one_example(
             ex,
             storage_dir=storage_dir,
             wrench=args.wrench,
             version=version,
             log_limit=args.log_limit,
+            description=description,
         )
         index.append(
             {
                 "guid": str(ex.guid),
                 "isa": ex.isa,
-                "name": ex.display_name,
+                "title": title,
+                "description": description,
                 "ok": ok,
             }
         )
@@ -232,9 +271,20 @@ def main(argv: list[str]) -> int:
     index_fn.write_text(json.dumps(index, indent=2), encoding="utf-8")
     print(f"Wrote {index_fn}")
 
+    unpaired = find_unpaired(args.example_root, examples)
+    for u in unpaired:
+        print(
+            f"WARNING: file does not follow the example naming convention "
+            f"(expected <name>.s paired with <name>[-suffix].yaml): {u}",
+            file=sys.stderr,
+        )
+
     if failed and args.fail_fast:
         print(f"{len(failed)} example(s) failed.", file=sys.stderr)
         return 2
+    if unpaired and args.fail_fast:
+        print(f"{len(unpaired)} unpaired example file(s).", file=sys.stderr)
+        return 3
     return 0
 
 

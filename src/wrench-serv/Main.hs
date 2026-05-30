@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Crypto.Hash.SHA1 qualified as SHA1
-import Data.Aeson (FromJSON (..), eitherDecodeStrict, withObject, (.:))
+import Data.Aeson (FromJSON (..), eitherDecodeStrict, withObject, (.!=), (.:), (.:?))
 import Data.ByteString qualified as B
 import Data.Text (isSuffixOf, replace)
 import Data.Text qualified as T
@@ -251,22 +251,26 @@ type GetExamples = Get '[HTML] (Html ())
 data ExampleEntry = ExampleEntry
     { eeGuid :: Text
     , eeIsa :: Text
-    , eeName :: Text
+    , eeTitle :: Text
+    , eeDescription :: Text
     , eeOk :: Bool
     }
 
 instance FromJSON ExampleEntry where
-    parseJSON =
-        withObject "ExampleEntry" $ \o ->
+    parseJSON = withObject "ExampleEntry" $ \o -> do
+        guid <- o .: "guid"
+        isa <- o .: "isa"
+        title <- o .: "title"
+        description <- o .:? "description" .!= ""
+        ok <- o .: "ok"
+        pure
             ExampleEntry
-                <$> o
-                .: "guid"
-                <*> o
-                .: "isa"
-                <*> o
-                .: "name"
-                <*> o
-                .: "ok"
+                { eeGuid = guid
+                , eeIsa = isa
+                , eeTitle = title
+                , eeDescription = description
+                , eeOk = ok
+                }
 
 getExamples :: Config -> Handler (Html ())
 getExamples Config{cExamplesPath} = do
@@ -300,7 +304,7 @@ renderExamplesList :: [ExampleEntry] -> Text
 renderExamplesList [] =
     "<p class=\"text-[var(--c-grey)]\">No examples available.</p>"
 renderExamplesList entries =
-    T.concat $ map renderGroup $ groupByIsa $ sortWith (\e -> (eeIsa e, eeName e)) entries
+    T.concat $ map renderGroup $ groupByIsa $ sortWith (\e -> (eeIsa e, eeTitle e)) entries
 
 groupByIsa :: [ExampleEntry] -> [(Text, [ExampleEntry])]
 groupByIsa = foldr step []
@@ -322,11 +326,17 @@ renderGroup (isa, items) =
         <> "</div>"
 
 renderItem :: ExampleEntry -> Text
-renderItem ExampleEntry{eeGuid, eeName, eeOk} =
+renderItem ExampleEntry{eeGuid, eeTitle, eeDescription, eeOk} =
     let (statusClass, statusLabel) =
             if eeOk
                 then ("text-[var(--c-green)]", "ok")
                 else ("text-[var(--c-orange)]", "fail")
+        descHtml
+            | T.null eeDescription = ""
+            | otherwise =
+                "<div class=\"w-full pl-[3ch] text-[var(--c-grey)] text-sm\">"
+                    <> escapeHtml eeDescription
+                    <> "</div>"
      in "<li class=\"flex flex-wrap items-baseline gap-x-2\">"
             <> "<span class=\""
             <> statusClass
@@ -336,8 +346,9 @@ renderItem ExampleEntry{eeGuid, eeName, eeOk} =
             <> "<a href=\"/report/"
             <> escapeHtml eeGuid
             <> "\" class=\"hover:bg-[var(--c-fuschia)] pt-[0.2ch] pb-[0.2ch] text-[var(--c-fuschia)] hover:text-[var(--c-black)] cursor-pointer\">["
-            <> escapeHtml eeName
+            <> escapeHtml eeTitle
             <> "]</a>"
+            <> descHtml
             <> "</li>"
 
 syncExamples :: Config -> IO ()
