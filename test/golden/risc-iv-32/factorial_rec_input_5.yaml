@@ -16,3 +16,15 @@ reports:
     assert: |
       numio[0x80]: [] >>> []
       numio[0x84]: [] >>> [120]
+  - name: stats
+    slice: last
+    view: |
+      instructions: {sim:instruction-count}
+      mem-instr: {mem:instr-range}
+      mem-data: {mem:data-range}
+      mem-io: {mem:io-range}
+    assert: |
+      instructions: 87
+      mem-instr: 0..75, 140..187
+      mem-data: 100..107, 566..597
+      mem-io: 128..135
