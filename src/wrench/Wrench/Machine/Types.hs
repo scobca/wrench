@@ -7,6 +7,12 @@ module Wrench.Machine.Types (
     Cell (..),
     InitState (..),
     StateInterspector (..),
+    Intervals (..),
+    emptyIntervals,
+    recordRange,
+    renderIntervals,
+    AccessLog (..),
+    emptyAccessLog,
     MachineWord,
     FromSign (..),
     RegisterId,
@@ -25,6 +31,7 @@ module Wrench.Machine.Types (
 
 import Data.Bits
 import Data.Default (Default, def)
+import Data.Text qualified as T
 import Relude
 import Relude.Extra (keys)
 
@@ -194,6 +201,8 @@ data IoMem isa w = IoMem
     , mIoCells :: Mem isa w
     , mIoKeys :: [Int]
     , mIoByteToWord :: IntMap Int
+    , mAccessLog :: !AccessLog
+    -- ^ Tracks the address ranges touched at runtime, surfaced via @mem:*@.
     }
     deriving (Eq, Show)
 
@@ -203,6 +212,7 @@ mkIoMem streams cells =
         { mIoStreams = streams
         , mIoCells = cells
         , mIoKeys = keys streams
+        , mAccessLog = emptyAccessLog
         , mIoByteToWord =
             fromList $ concatMap (\i -> map (,i) [i .. i + byteSizeT @w - 1]) (keys streams)
         }
@@ -212,3 +222,45 @@ data Cell isa w
     | InstructionPart
     | Value Word8
     deriving (Eq, Show)
+
+-----------------------------------------------------------
+-- Address-range accounting (mem:* stats)
+
+-- | Sorted, non-overlapping, inclusive address ranges. Adjacent ranges
+--   (one ending at N, the next starting at N+1) are merged on insert so the
+--   list always reflects maximally-coalesced clusters of accesses.
+newtype Intervals = Intervals {unIntervals :: [(Int, Int)]}
+    deriving (Eq, Show)
+
+emptyIntervals :: Intervals
+emptyIntervals = Intervals []
+
+-- | Record an access spanning @[addr .. addr+len-1]@. Length must be ≥ 1.
+recordRange :: Int -> Int -> Intervals -> Intervals
+recordRange addr len (Intervals xs) = Intervals (insertMerge addr (addr + len - 1) xs)
+    where
+        insertMerge l h [] = [(l, h)]
+        insertMerge l h ((l', h') : rest)
+            | h + 1 < l' = (l, h) : (l', h') : rest -- fully before the next interval
+            | l > h' + 1 = (l', h') : insertMerge l h rest -- fully after this interval
+            | otherwise = insertMerge (min l l') (max h h') rest -- overlap or touch — merge and re-insert
+
+-- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty).
+renderIntervals :: Intervals -> Text
+renderIntervals (Intervals []) = "-"
+renderIntervals (Intervals xs) =
+    T.intercalate ", " [show lo <> ".." <> show hi | (lo, hi) <- xs]
+
+-- | Runtime access ranges accumulated by 'IoMem' while the program runs.
+data AccessLog = AccessLog
+    { alInstr :: !Intervals
+    -- ^ Instruction-fetch addresses.
+    , alData :: !Intervals
+    -- ^ Data read/write addresses (merged — we don't distinguish direction).
+    , alIo :: !Intervals
+    -- ^ Memory-mapped IO addresses touched.
+    }
+    deriving (Eq, Show)
+
+emptyAccessLog :: AccessLog
+emptyAccessLog = AccessLog{alInstr = emptyIntervals, alData = emptyIntervals, alIo = emptyIntervals}

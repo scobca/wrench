@@ -117,11 +117,15 @@ selectSlice LastSlice = take 1 . reverse
 
 prepareStateView line TranslatorResult{labels, dumpStats} instrCount st =
     let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
+        AccessLog{alInstr, alData, alIo} = accessLog (memoryDump st)
         resolver v = case v of
             "sim:instruction-count" -> show instrCount
             "layout:sections" -> show dsSectionsTotalBytes
             "layout:text-sections" -> show dsTextSectionsBytes
             "layout:data-sections" -> show dsDataSectionsBytes
+            "mem:instr-range" -> renderIntervals alInstr
+            "mem:data-range" -> renderIntervals alData
+            "mem:io-range" -> renderIntervals alIo
             _ -> reprState labels st v
      in toString $ substituteBrackets resolver line
 
@@ -136,7 +140,7 @@ defaultView labels st "pc:label" =
         (l, _a) : _ -> "@" <> toText l
         _ -> ""
 defaultView _labels st "instruction" =
-    Just $ either error show (readInstruction (memoryDump st) (programCounter st))
+    Just $ either error (show . snd) (readInstruction (memoryDump st) (programCounter st))
 defaultView labels st v =
     case T.splitOn ":" v of
         ["pc"] -> Just $ reprState labels st "pc:dec"

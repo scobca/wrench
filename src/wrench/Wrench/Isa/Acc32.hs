@@ -282,15 +282,17 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
             _ -> errorView v
 
 instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w w) w where
-    instructionFetch =
-        get
-            <&> ( \case
-                    State{stopped = True} -> Left halted
-                    State{internalError = Just err} -> Left err
-                    State{pc, ram} -> do
-                        instruction <- readInstruction ram pc
-                        Right (pc, instruction)
-                )
+    instructionFetch = do
+        st <- get
+        case st of
+            State{stopped = True} -> return $ Left halted
+            State{internalError = Just err} -> return $ Left err
+            State{pc, ram} ->
+                case readInstruction ram pc of
+                    Left err -> return $ Left err
+                    Right (ram', instruction) -> do
+                        put st{ram = ram'}
+                        return $ Right (pc, instruction)
     instructionExecute pc instruction =
         case instruction of
             LoadImm a -> setAcc a >> nextPc
