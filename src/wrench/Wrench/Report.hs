@@ -118,13 +118,23 @@ selectSlice LastSlice = take 1 . reverse
 -----------------------------------------------------------
 
 prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount st =
-    let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
+    let DumpStats
+            { dsSectionsTotalBytes
+            , dsTextSectionsBytes
+            , dsDataSectionsBytes
+            , dsTextIntervals
+            , dsDataIntervals
+            } = dumpStats
         AccessLog{alInstr, alData, alIo} = accessLog (memoryDump finalState)
         resolver v = case T.splitOn ":" v of
             ["sim", "instruction-count"] -> show instrCount
             ["layout", "sections-size"] -> show dsSectionsTotalBytes
             ["layout", "text-sections-size"] -> show dsTextSectionsBytes
             ["layout", "data-sections-size"] -> show dsDataSectionsBytes
+            ["layout", "text-ranges"] -> renderIntervalsHex dsTextIntervals
+            ["layout", "text-ranges", fmt] -> rangesFmt fmt dsTextIntervals
+            ["layout", "data-ranges"] -> renderIntervalsHex dsDataIntervals
+            ["layout", "data-ranges", fmt] -> rangesFmt fmt dsDataIntervals
             ["mem", "instr-ranges"] -> renderIntervalsHex alInstr
             ["mem", "instr-ranges", fmt] -> rangesFmt fmt alInstr
             ["mem", "data-ranges"] -> renderIntervalsHex alData
