@@ -17,3 +17,9 @@ reports:
     assert: |
       numio[0x80]: [] >>> []
       numio[0x84]: [] >>> [120]
+  - name: stats
+    slice: last
+    view: |
+      instructions: {sim:instruction-count}
+    assert: |
+      instructions: 42

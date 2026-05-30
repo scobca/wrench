@@ -88,3 +88,6 @@
 # result
 numio[0x80]: [] >>> []
 numio[0x84]: [] >>> [120]
+---
+# stats
+instructions: 42
