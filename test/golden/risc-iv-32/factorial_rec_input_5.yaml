@@ -25,6 +25,6 @@ reports:
       mem-io: {mem:io-range}
     assert: |
       instructions: 87
-      mem-instr: 0..75, 140..187
+      mem-instr: 0..75, 140..191
       mem-data: 100..107, 566..597
       mem-io: 128..135

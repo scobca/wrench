@@ -94,6 +94,6 @@ instructions: 42
 sections: 128
 text: 120
 data: 8
-mem-instr: 8..55, 108..123
+mem-instr: 8..55, 108..127
 mem-data: 0..7
 mem-io: 128..135

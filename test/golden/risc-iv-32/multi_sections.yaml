@@ -25,6 +25,6 @@ reports:
       sections: 76
       text: 68
       data: 8
-      mem-instr: 0..35, 44..71
+      mem-instr: 0..39, 44..71
       mem-data: 40..43, 72..75, 508..511
       mem-io: 128..135

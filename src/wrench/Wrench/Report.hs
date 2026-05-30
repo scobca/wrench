@@ -55,6 +55,7 @@ instance FromJSON ReportConf where
 prepareReport
     trResult@TranslatorResult{}
     verbose
+    finalState
     records
     rc@ReportConf{rcName, rcSlice, rcAssert, rcView} =
         let header = maybe "" ("# " <>) rcName
@@ -67,7 +68,8 @@ prepareReport
                         $ filter (not . null)
                         $ map
                             ( \case
-                                TState{tInstructionCount, tState} -> prepareStateView rvView' trResult tInstructionCount tState
+                                TState{tInstructionCount, tState} ->
+                                    prepareStateView rvView' trResult finalState tInstructionCount tState
                                 (TError err) -> "ERROR: " <> toString err <> "\n"
                                 (TWarn warn) -> "WARN: " <> toString warn <> "\n"
                             )
@@ -115,9 +117,9 @@ selectSlice LastSlice = take 1 . reverse
 
 -----------------------------------------------------------
 
-prepareStateView line TranslatorResult{labels, dumpStats} instrCount st =
+prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount st =
     let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
-        AccessLog{alInstr, alData, alIo} = accessLog (memoryDump st)
+        AccessLog{alInstr, alData, alIo} = accessLog (memoryDump finalState)
         resolver v = case v of
             "sim:instruction-count" -> show instrCount
             "layout:sections" -> show dsSectionsTotalBytes

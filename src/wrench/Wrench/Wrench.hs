@@ -165,9 +165,9 @@ wrench Options{input = fn, verbose, maxStateLogLimit} Config{cMemorySize, cLimit
         ioDump = mkIoMem mIoStreams dump
         st :: st = initState (fromEnum pc) ioDump randomStream
 
-    traceLog <- powerOn cLimit maxStateLogLimit labels st
+    (traceLog, finalState) <- powerOn cLimit maxStateLogLimit labels st
 
-    let reports = maybe [] (map (prepareReport trResult verbose traceLog)) cReports
+    let reports = maybe [] (map (prepareReport trResult verbose finalState traceLog)) cReports
         isSuccess = all fst reports
         reportTexts = map snd reports
 

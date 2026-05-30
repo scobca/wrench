@@ -46,10 +46,14 @@ tellState machineState = modify
 tellError msg = modify $ \sim@Simulation{log} ->
     sim{log = TError msg : log}
 
-simulate :: (Machine st isa w) => Simulation st isa -> [Trace st isa]
+-- | Run the simulation and return both the recorded trace log and the final
+--   machine state. The final state carries the complete runtime accumulators
+--   (e.g. 'AccessLog' in 'IoMem'); per-state trace entries are recorded
+--   pre-step and therefore don't include the last instruction's accesses.
+simulate :: (Machine st isa w) => Simulation st isa -> ([Trace st isa], st)
 simulate sim =
-    let Simulation{log} = execState simulate' sim
-     in reverse log
+    let Simulation{log, machineState} = execState simulate' sim
+     in (reverse log, machineState)
 
 simulateInstructionStep :: (Machine st isa w) => State (Simulation st isa) ()
 simulateInstructionStep =
@@ -78,7 +82,7 @@ powerOn ::
     -> Int
     -> HashMap String w
     -> st
-    -> Either Text [Trace st isa]
+    -> Either Text ([Trace st isa], st)
 powerOn instructionLimits stateRecordLimits labels machineInitState = do
     let pc2label = fromList $ map (\(a, b) -> (fromEnum b, a)) $ toPairs labels
     Right
