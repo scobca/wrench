@@ -9,6 +9,7 @@ module Wrench.Machine.Memory (
     word32ToHex,
     prepareDump,
     prettyDump,
+    DumpStats (..),
 ) where
 
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -20,7 +21,19 @@ import Relude.Unsafe qualified as Unsafe
 import Wrench.Machine.Types
 import Wrench.Translator.Types
 
-prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> Mem isa w
+-- | Translation-time memory layout statistics, surfaced to report views via the
+--   @layout:*@ namespace.
+data DumpStats = DumpStats
+    { dsSectionsTotalBytes :: !Int
+    -- ^ Sum of byte sizes of all sections (no .org gaps).
+    , dsTextSectionsBytes :: !Int
+    -- ^ Sum of byte sizes of code (text) sections only.
+    , dsDataSectionsBytes :: !Int
+    -- ^ Sum of byte sizes of data sections only.
+    }
+    deriving (Eq, Show)
+
+prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> (Mem isa w, DumpStats)
 prepareDump memorySize sections =
     let addSection cells offset dump =
             let dump' = zip [offset ..] cells
@@ -55,14 +68,24 @@ prepareDump memorySize sections =
                     sections
         dumpSize = maximum1 $ 0 :| keys fromSections
         placeholder = map (,Value 0) [0 .. memorySize - 1]
+        textBytes = sum [byteSize s | s@Code{} <- sections]
+        dataBytes = sum [byteSize s | s@Data{} <- sections]
+        stats =
+            DumpStats
+                { dsSectionsTotalBytes = textBytes + dataBytes
+                , dsTextSectionsBytes = textBytes
+                , dsDataSectionsBytes = dataBytes
+                }
      in if dumpSize > memorySize
             then
                 error $ "error: can not fit translation results in memory, need: " <> show dumpSize <> " available: " <> show memorySize
             else
-                Mem
+                ( Mem
                     { memorySize
                     , memoryData = fromList (placeholder <> fromSections)
                     }
+                , stats
+                )
 
 isValue Value{} = True
 isValue _ = False

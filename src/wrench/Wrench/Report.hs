@@ -115,9 +115,13 @@ selectSlice LastSlice = take 1 . reverse
 
 -----------------------------------------------------------
 
-prepareStateView line TranslatorResult{labels} instrCount st =
-    let resolver v = case v of
+prepareStateView line TranslatorResult{labels, dumpStats} instrCount st =
+    let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
+        resolver v = case v of
             "sim:instruction-count" -> show instrCount
+            "layout:sections" -> show dsSectionsTotalBytes
+            "layout:text-sections" -> show dsTextSectionsBytes
+            "layout:data-sections" -> show dsDataSectionsBytes
             _ -> reprState labels st v
      in toString $ substituteBrackets resolver line
 
