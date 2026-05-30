@@ -42,6 +42,8 @@ dependencies:
   - aeson-casing
   - base >= 4.7 && < 5
   - data-default
+  - data-interval
+  - extended-reals
   - filepath
   - gitrev
   - megaparsec

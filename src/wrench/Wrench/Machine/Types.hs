@@ -31,6 +31,10 @@ module Wrench.Machine.Types (
 
 import Data.Bits
 import Data.Default (Default, def)
+import Data.ExtendedReal (Extended (Finite))
+import Data.Interval qualified as I
+import Data.IntervalSet (IntervalSet)
+import Data.IntervalSet qualified as IS
 import Data.Text qualified as T
 import Relude
 import Relude.Extra (keys)
@@ -226,30 +230,37 @@ data Cell isa w
 -----------------------------------------------------------
 -- Address-range accounting (mem:* stats)
 
--- | Sorted, non-overlapping, inclusive address ranges. Adjacent ranges
---   (one ending at N, the next starting at N+1) are merged on insert so the
---   list always reflects maximally-coalesced clusters of accesses.
-newtype Intervals = Intervals {unIntervals :: [(Int, Int)]}
+-- | Sorted, non-overlapping integer address ranges with adjacency merging.
+--   Backed by 'IntervalSet' 'Integer' from the @data-interval@ package.
+--
+--   We store each access as the half-open interval @[lo, hi+1)@ so that two
+--   integer-adjacent accesses (one ending at N, the next starting at N+1)
+--   share a boundary and get merged by 'IS.insert'. On render we convert
+--   back to the inclusive @"lo..hi"@ form by subtracting 1 from the upper.
+newtype Intervals = Intervals {unIntervals :: IntervalSet Integer}
     deriving (Eq, Show)
 
 emptyIntervals :: Intervals
-emptyIntervals = Intervals []
+emptyIntervals = Intervals IS.empty
 
 -- | Record an access spanning @[addr .. addr+len-1]@. Length must be ≥ 1.
 recordRange :: Int -> Int -> Intervals -> Intervals
-recordRange addr len (Intervals xs) = Intervals (insertMerge addr (addr + len - 1) xs)
-    where
-        insertMerge l h [] = [(l, h)]
-        insertMerge l h ((l', h') : rest)
-            | h + 1 < l' = (l, h) : (l', h') : rest -- fully before the next interval
-            | l > h' + 1 = (l', h') : insertMerge l h rest -- fully after this interval
-            | otherwise = insertMerge (min l l') (max h h') rest -- overlap or touch — merge and re-insert
+recordRange addr len (Intervals s) =
+    let lo = Finite (toInteger addr)
+        hi = Finite (toInteger (addr + len))
+     in Intervals (IS.insert (lo I.<=..< hi) s)
 
 -- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty).
 renderIntervals :: Intervals -> Text
-renderIntervals (Intervals []) = "-"
-renderIntervals (Intervals xs) =
-    T.intercalate ", " [show lo <> ".." <> show hi | (lo, hi) <- xs]
+renderIntervals (Intervals s) =
+    case IS.toAscList s of
+        [] -> "-"
+        is -> T.intercalate ", " (map renderInterval is)
+    where
+        renderInterval i =
+            let lo = case I.lowerBound i of Finite n -> n; _ -> error "Intervals: unexpected infinite lower bound"
+                hi = case I.upperBound i of Finite n -> n - 1; _ -> error "Intervals: unexpected infinite upper bound"
+             in show lo <> ".." <> show hi
 
 -- | Runtime access ranges accumulated by 'IoMem' while the program runs.
 data AccessLog = AccessLog

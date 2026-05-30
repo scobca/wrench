@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.39.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -81,6 +81,8 @@ library
     , aeson-casing
     , base >=4.7 && <5
     , data-default
+    , data-interval
+    , extended-reals
     , filepath
     , gitrev
     , megaparsec
@@ -153,6 +155,8 @@ executable wrench
     , aeson-casing
     , base >=4.7 && <5
     , data-default
+    , data-interval
+    , extended-reals
     , filepath
     , gitrev
     , megaparsec
@@ -203,7 +207,9 @@ executable wrench-fmt
     , aeson-casing
     , base >=4.7 && <5
     , data-default
+    , data-interval
     , directory
+    , extended-reals
     , filepath
     , gitrev
     , http-api-data
@@ -277,7 +283,9 @@ executable wrench-serv
     , cryptohash-sha1
     , crypton
     , data-default
+    , data-interval
     , directory
+    , extended-reals
     , filepath
     , gitrev
     , http-api-data
@@ -356,6 +364,8 @@ test-suite wrench-test
     , aeson-casing
     , base >=4.7 && <5
     , data-default
+    , data-interval
+    , extended-reals
     , filepath
     , gitrev
     , megaparsec
