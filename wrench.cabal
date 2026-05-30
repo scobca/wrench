@@ -82,7 +82,6 @@ library
     , base >=4.7 && <5
     , data-default
     , data-interval
-    , extended-reals
     , filepath
     , gitrev
     , megaparsec
@@ -156,7 +155,6 @@ executable wrench
     , base >=4.7 && <5
     , data-default
     , data-interval
-    , extended-reals
     , filepath
     , gitrev
     , megaparsec
@@ -209,7 +207,6 @@ executable wrench-fmt
     , data-default
     , data-interval
     , directory
-    , extended-reals
     , filepath
     , gitrev
     , http-api-data
@@ -285,7 +282,6 @@ executable wrench-serv
     , data-default
     , data-interval
     , directory
-    , extended-reals
     , filepath
     , gitrev
     , http-api-data
@@ -365,7 +361,6 @@ test-suite wrench-test
     , base >=4.7 && <5
     , data-default
     , data-interval
-    , extended-reals
     , filepath
     , gitrev
     , megaparsec

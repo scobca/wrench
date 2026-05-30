@@ -31,7 +31,6 @@ module Wrench.Machine.Types (
 
 import Data.Bits
 import Data.Default (Default, def)
-import Data.ExtendedReal (Extended (Finite))
 import Data.Interval qualified as I
 import Data.IntervalSet (IntervalSet)
 import Data.IntervalSet qualified as IS
@@ -246,8 +245,8 @@ emptyIntervals = Intervals IS.empty
 -- | Record an access spanning @[addr .. addr+len-1]@. Length must be ≥ 1.
 recordRange :: Int -> Int -> Intervals -> Intervals
 recordRange addr len (Intervals s) =
-    let lo = Finite (toInteger addr)
-        hi = Finite (toInteger (addr + len))
+    let lo = I.Finite (toInteger addr)
+        hi = I.Finite (toInteger (addr + len))
      in Intervals (IS.insert (lo I.<=..< hi) s)
 
 -- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty).
@@ -258,8 +257,8 @@ renderIntervals (Intervals s) =
         is -> T.intercalate ", " (map renderInterval is)
     where
         renderInterval i =
-            let lo = case I.lowerBound i of Finite n -> n; _ -> error "Intervals: unexpected infinite lower bound"
-                hi = case I.upperBound i of Finite n -> n - 1; _ -> error "Intervals: unexpected infinite upper bound"
+            let lo = case I.lowerBound i of I.Finite n -> n; _ -> error "Intervals: unexpected infinite lower bound"
+                hi = case I.upperBound i of I.Finite n -> n - 1; _ -> error "Intervals: unexpected infinite upper bound"
              in show lo <> ".." <> show hi
 
 -- | Runtime access ranges accumulated by 'IoMem' while the program runs.
