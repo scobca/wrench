@@ -3,6 +3,7 @@
 module Main (main) where
 
 import Crypto.Hash.SHA1 qualified as SHA1
+import Data.Aeson (FromJSON (..), eitherDecodeStrict, withObject, (.:))
 import Data.ByteString qualified as B
 import Data.Text (isSuffixOf, replace)
 import Data.Text qualified as T
@@ -247,33 +248,93 @@ versionWarning reportVer
 
 type GetExamples = Get '[HTML] (Html ())
 
+data ExampleEntry = ExampleEntry
+    { eeGuid :: Text
+    , eeIsa :: Text
+    , eeName :: Text
+    , eeOk :: Bool
+    }
+
+instance FromJSON ExampleEntry where
+    parseJSON =
+        withObject "ExampleEntry" $ \o ->
+            ExampleEntry
+                <$> o .: "guid"
+                <*> o .: "isa"
+                <*> o .: "name"
+                <*> o .: "ok"
+
 getExamples :: Config -> Handler (Html ())
-getExamples _ = do
-    let path = "static/examples.html"
-    exists <- liftIO (doesFileExist path)
-    template <-
-        if exists
-            then liftIO (decodeUtf8 <$> readFileBS path)
-            else return placeholderExamplesPage
+getExamples Config{cExamplesPath} = do
+    template <- liftIO (decodeUtf8 <$> readFileBS "static/examples.html")
+    entries <- liftIO $ readExamplesIndex cExamplesPath
     let rendered =
             foldl'
                 (\st (pat, new) -> replace pat new st)
                 template
-                [ ("{{tracker}}", postHogTracker)
+                [ ("{{examples}}", renderExamplesList entries)
+                , ("{{tracker}}", postHogTracker)
                 , ("{{version}}", wrenchVersion)
                 ]
     return $ toHtmlRaw rendered
 
-placeholderExamplesPage :: Text
-placeholderExamplesPage =
-    T.unlines
-        [ "<!doctype html><html><body style=\"background:#1a1a1a;color:#eee;font-family:monospace;padding:2em\">"
-        , "<h1>Wrench Examples</h1>"
-        , "<p>Examples have not been built for this deployment.</p>"
-        , "<p>Run <code>script/build_examples.py</code> during the docker image build to pre-render reports.</p>"
-        , "<p><a style=\"color:#7fa\" href=\"/\">[submit]</a></p>"
-        , "</body></html>"
-        ]
+readExamplesIndex :: FilePath -> IO [ExampleEntry]
+readExamplesIndex examplesPath = do
+    let indexFn = examplesPath </> "index.json"
+    exists <- doesFileExist indexFn
+    if not exists
+        then return []
+        else do
+            raw <- readFileBS indexFn
+            case eitherDecodeStrict raw of
+                Right entries -> return entries
+                Left err -> do
+                    putStrLn $ "Failed to parse " <> indexFn <> ": " <> err
+                    return []
+
+renderExamplesList :: [ExampleEntry] -> Text
+renderExamplesList [] =
+    "<p class=\"text-[var(--c-grey)]\">No examples available.</p>"
+renderExamplesList entries =
+    T.concat $ map renderGroup $ groupByIsa $ sortWith (\e -> (eeIsa e, eeName e)) entries
+
+groupByIsa :: [ExampleEntry] -> [(Text, [ExampleEntry])]
+groupByIsa = foldr step []
+    where
+        step e [] = [(eeIsa e, [e])]
+        step e (g@(isa, es) : rest)
+            | eeIsa e == isa = (isa, e : es) : rest
+            | otherwise = (eeIsa e, [e]) : g : rest
+
+renderGroup :: (Text, [ExampleEntry]) -> Text
+renderGroup (isa, items) =
+    "<div class=\"mb-8\">"
+        <> "<h2 class=\"mb-3 pb-1 border-b border-zinc-700 text-[var(--c-grey)] text-xl\">/* "
+        <> escapeHtml isa
+        <> " */</h2>"
+        <> "<ul class=\"space-y-1\">"
+        <> T.concat (map renderItem items)
+        <> "</ul>"
+        <> "</div>"
+
+renderItem :: ExampleEntry -> Text
+renderItem ExampleEntry{eeGuid, eeName, eeOk} =
+    let (statusClass, statusLabel) =
+            if eeOk
+                then ("text-[var(--c-green)]", "ok")
+                else ("text-[var(--c-orange)]", "fail")
+     in "<li class=\"flex flex-wrap items-baseline gap-x-2\">"
+            <> "<span class=\""
+            <> statusClass
+            <> "\">["
+            <> statusLabel
+            <> "]</span>"
+            <> "<a href=\"/report/"
+            <> escapeHtml eeGuid
+            <> "\" class=\"hover:bg-[var(--c-fuschia)] pt-[0.2ch] pb-[0.2ch] text-[var(--c-fuschia)] hover:text-[var(--c-black)] cursor-pointer\">["
+            <> escapeHtml eeName
+            <> "]</a>"
+            <> "</li>"
 
 syncExamples :: Config -> IO ()
 syncExamples Config{cExamplesPath, cStoragePath} = do

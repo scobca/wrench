@@ -3,24 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import html as html_mod
+import json
 import shutil
 import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 EXAMPLES_NAMESPACE = uuid.UUID("c1a4f8c0-1f6e-4f1a-bf6f-2ad9e7f6c0fe")
-
-ISA_DISPLAY = {
-    "risc-iv-32": "risc-iv-32",
-    "vliw-iv": "vliw-iv",
-    "f32a": "f32a",
-    "acc32": "acc32",
-    "m68k": "m68k",
-}
 
 
 @dataclass(frozen=True)
@@ -185,51 +176,10 @@ def build_one_example(
     return rc == 0
 
 
-def render_examples_html(
-    template: str, examples: Iterable[Example], *, success: dict[Example, bool]
-) -> str:
-    groups: dict[str, list[Example]] = {}
-    for ex in examples:
-        groups.setdefault(ex.isa, []).append(ex)
-
-    parts: list[str] = []
-    for isa in sorted(groups.keys()):
-        title = ISA_DISPLAY.get(isa, isa)
-        parts.append('<div class="mb-8">')
-        parts.append(
-            f'<h2 class="mb-3 pb-1 border-b border-zinc-700 text-[var(--c-grey)] text-xl">'
-            f"/* {html_mod.escape(title)} */</h2>"
-        )
-        parts.append('<ul class="space-y-1">')
-        for ex in sorted(groups[isa], key=lambda e: (e.source, e.config)):
-            href = f"/report/{ex.guid}"
-            ok = success.get(ex, True)
-            status_class = (
-                "text-[var(--c-green)]" if ok else "text-[var(--c-orange)]"
-            )
-            status_label = "ok" if ok else "fail"
-            parts.append(
-                '<li class="flex flex-wrap items-baseline gap-x-2">'
-                f'<span class="{status_class}">[{status_label}]</span>'
-                f'<a href="{html_mod.escape(href)}" '
-                'class="hover:bg-[var(--c-fuschia)] pt-[0.2ch] pb-[0.2ch] '
-                'text-[var(--c-fuschia)] hover:text-[var(--c-black)] cursor-pointer">'
-                f"[{html_mod.escape(ex.display_name)}]</a>"
-                "</li>"
-            )
-        parts.append("</ul>")
-        parts.append("</div>")
-
-    return template.replace("{{examples}}", "\n".join(parts))
-
-
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wrench", default="wrench")
     parser.add_argument("--example-root", type=Path, default=Path("example"))
-    parser.add_argument(
-        "--template", type=Path, default=Path("static/examples.template.html")
-    )
     parser.add_argument("--output", type=Path, default=Path("build/examples"))
     parser.add_argument("--log-limit", type=int, default=10000)
     parser.add_argument(
@@ -243,9 +193,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
 
-    template_path: Path = args.template
-    template = template_path.read_text(encoding="utf-8")
-
     storage_dir: Path = args.output / "storage"
     storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -258,7 +205,7 @@ def main(argv: list[str]) -> int:
     print(f"Using wrench: {args.wrench} ({version})")
     print(f"Discovered {len(examples)} example(s).")
 
-    success: dict[Example, bool] = {}
+    index: list[dict[str, object]] = []
     failed: list[Example] = []
     for ex in examples:
         ok = build_one_example(
@@ -268,15 +215,22 @@ def main(argv: list[str]) -> int:
             version=version,
             log_limit=args.log_limit,
         )
-        success[ex] = ok
+        index.append(
+            {
+                "guid": str(ex.guid),
+                "isa": ex.isa,
+                "name": ex.display_name,
+                "ok": ok,
+            }
+        )
         status = "OK" if ok else "FAIL"
         print(f"  [{status}] {ex.isa}/{ex.display_name} -> {ex.guid}")
         if not ok:
             failed.append(ex)
 
-    html_out = render_examples_html(template, examples, success=success)
-    (args.output / "examples.html").write_text(html_out, encoding="utf-8")
-    print(f"Wrote {args.output / 'examples.html'}")
+    index_fn = storage_dir / "index.json"
+    index_fn.write_text(json.dumps(index, indent=2), encoding="utf-8")
+    print(f"Wrote {index_fn}")
 
     if failed and args.fail_fast:
         print(f"{len(failed)} example(s) failed.", file=sys.stderr)

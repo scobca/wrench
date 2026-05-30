@@ -50,12 +50,10 @@ WORKDIR /app
 COPY --from=wrench-build /app/.local/bin/wrench /usr/local/bin/wrench
 COPY example /app/example
 COPY script/build_examples.py /app/build_examples.py
-COPY static/examples.template.html /app/examples.template.html
 
 RUN python3 /app/build_examples.py \
     --wrench /usr/local/bin/wrench \
     --example-root /app/example \
-    --template /app/examples.template.html \
     --output /app/out
 
 ###########################################################
@@ -82,7 +80,6 @@ COPY --from=wrench-build /app/.local/bin/wrench /app/.local/bin/wrench-serv /app
 COPY --from=wrench-variants /app/variants /app/variants
 COPY --from=wrench-examples /app/out/storage /app/examples_storage
 COPY static /app/static
-COPY --from=wrench-examples /app/out/examples.html /app/static/examples.html
 
 EXPOSE 8080
 

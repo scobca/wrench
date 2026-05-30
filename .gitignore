@@ -14,4 +14,3 @@ tmp.s
 tmp.yaml
 *.prof
 build/
-static/examples.html
