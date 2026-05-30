@@ -67,7 +67,7 @@ prepareReport
                         $ filter (not . null)
                         $ map
                             ( \case
-                                (TState st) -> prepareStateView rvView' trResult st
+                                TState{tInstructionCount, tState} -> prepareStateView rvView' trResult tInstructionCount tState
                                 (TError err) -> "ERROR: " <> toString err <> "\n"
                                 (TWarn warn) -> "WARN: " <> toString warn <> "\n"
                             )
@@ -115,8 +115,11 @@ selectSlice LastSlice = take 1 . reverse
 
 -----------------------------------------------------------
 
-prepareStateView line TranslatorResult{labels} st =
-    toString $ substituteBrackets (reprState labels st) line
+prepareStateView line TranslatorResult{labels} instrCount st =
+    let resolver v = case v of
+            "sim:instruction-count" -> show instrCount
+            _ -> reprState labels st v
+     in toString $ substituteBrackets resolver line
 
 defaultView ::
     (ByteSize isa, MachineWord w, Memory m isa w, Show isa, StateInterspector st m isa w) =>

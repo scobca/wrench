@@ -19,7 +19,7 @@ data Simulation st isa = Simulation
 
 tellState :: st -> State (Simulation st isa) ()
 tellState machineState = modify
-    $ \sim@Simulation{log, stateRecordCount, stateRecordLimits, takePartOnStateRecordLimit} ->
+    $ \sim@Simulation{log, stateRecordCount, stateRecordLimits, takePartOnStateRecordLimit, instructionCount} ->
         if stateRecordCount >= stateRecordLimits
             then
                 let n = (stateRecordLimits `div` takePartOnStateRecordLimit)
@@ -27,7 +27,7 @@ tellState machineState = modify
                     rest' =
                         filter
                             ( \case
-                                TState _ -> False
+                                TState{} -> False
                                 _ -> True
                             )
                             rest
@@ -39,7 +39,7 @@ tellState machineState = modify
                         }
             else
                 sim
-                    { log = TState machineState : log
+                    { log = TState{tInstructionCount = instructionCount + 1, tState = machineState} : log
                     , stateRecordCount = stateRecordCount + 1
                     }
 

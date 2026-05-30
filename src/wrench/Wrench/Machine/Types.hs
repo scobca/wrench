@@ -172,7 +172,13 @@ halted :: Text
 halted = "halted"
 
 data Trace st isa
-    = TState st
+    = -- | A captured machine state, tagged with the 1-indexed instruction step
+      --   number it sits before (i.e. the @sim:instruction-count@ value at this
+      --   point in the trace).
+      TState
+        { tInstructionCount :: !Int
+        , tState :: !st
+        }
     | TError Text
     | TWarn Text
     deriving (Show)
