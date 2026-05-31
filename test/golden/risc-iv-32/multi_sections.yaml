@@ -12,19 +12,19 @@ reports:
     assert: |
       numio[0x80]: [] >>> []
       numio[0x84]: [] >>> [7]
-  - name: stats
+  - name: memory-map
     slice: last
     view: |
-      layout:sections-size: {layout:sections-size}
-      layout:text-sections-size: {layout:text-sections-size}
-      layout:data-sections-size: {layout:data-sections-size}
-      mem:instr-ranges: {mem:instr-ranges}
-      mem:data-ranges: {mem:data-ranges}
-      mem:io-ranges: {mem:io-ranges}
+      {memory:table}
     assert: |
-      layout:sections-size: 84
-      layout:text-sections-size: 76
-      layout:data-sections-size: 8
-      mem:instr-ranges: 0x0..0x27, 0x40..0x5b
-      mem:data-ranges: 0x28..0x2b, 0x64..0x67, 0x1fc..0x1ff
-      mem:io-ranges: 0x80..0x87
+      Kind  Range         Bytes  Accessed                    Coverage
+      text  0x000..0x027     40  0x000..0x027                    100%
+      data  0x028..0x02B      4  0x028..0x02B                    100%
+      x     0x02C..0x07F     84  -                                 0%
+      io    0x080..0x087      8  0x080..0x087                    100%
+      x     0x088..0x08F      8  -                                 0%
+      text  0x090..0x0E3     84  0x090..0x0E3                    100%
+      data  0x0E4..0x0F9     22  0x0E4..0x0EE, 0x0F5..0x0F9       72%
+      x     0x0FA..0x1FB    258  -                                 0%
+      x     0x1FC..0x1FF      4  0x1FC..0x1FF                    100%
+      x     0x200..0x2FF    256  -                                 0%
