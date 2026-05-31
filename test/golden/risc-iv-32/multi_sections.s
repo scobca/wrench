@@ -1,7 +1,7 @@
-; Exercises a layout with two .text and two .data sections plus a stack.
-; The stats report should capture all four section clusters in mem:data /
-; mem:instr ranges, the IO accesses in mem:io, and the stack pushes/pops
-; sitting outside any declared section.
+; Two .text + two .data sections plus a stack. `.org` introduces an
+; explicit gap before the second .text section, and two trailing
+; instructions in `write_out` are deliberately unreachable so the
+; second text section has partial coverage.
 
     .text
 _start:
@@ -23,18 +23,23 @@ _start:
     .data
 input_ptr:       .word  0x80              ; -> data section 1
 
+    ; Force a gap before the second .text section so the layout has
+    ; addresses that belong to no declared region.
     .text
+    .org     64
 write_out:
-    ; Pop the saved input from the stack.
     lw       a0, 0(sp)
     addi     sp, sp, 4
 
-    ; Load output pointer from data section 2, then write.
     lui      t1, %hi(output_ptr)
     addi     t1, t1, %lo(output_ptr)
     lw       t1, 0(t1)
     sw       a0, 0(t1)
     jr       ra
+
+unreachable:                              ; dead code — never fetched
+    addi     zero, zero, 0
+    halt
 
     .data
 output_ptr:      .word  0x84              ; -> data section 2

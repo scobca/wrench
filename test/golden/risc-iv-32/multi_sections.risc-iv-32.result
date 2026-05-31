@@ -4,9 +4,9 @@ numio[0x80]: [] >>> []
 numio[0x84]: [] >>> [7]
 ---
 # stats
-layout:sections-size: 76
-layout:text-sections-size: 68
+layout:sections-size: 84
+layout:text-sections-size: 76
 layout:data-sections-size: 8
-mem:instr-ranges: 0..39, 44..71
-mem:data-ranges: 40..43, 72..75, 508..511
+mem:instr-ranges: 0..39, 64..91
+mem:data-ranges: 40..43, 100..103, 508..511
 mem:io-ranges: 128..135
