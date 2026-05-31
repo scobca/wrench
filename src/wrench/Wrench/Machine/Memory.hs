@@ -222,12 +222,12 @@ ioPortByteCollision IoMem{mIoKeys} addr =
         parts = concatMap mkParts mIoKeys
      in (addr `elem` parts)
 
-recordInstr, recordData, recordIo :: Int -> Int -> IoMem isa w -> IoMem isa w
-recordInstr addr len io =
+noteInstrAccess, noteDataAccess, noteIoAccess :: Int -> Int -> IoMem isa w -> IoMem isa w
+noteInstrAccess addr len io =
     io{mAccessLog = (mAccessLog io){alInstr = recordRange addr len (alInstr (mAccessLog io))}}
-recordData addr len io =
+noteDataAccess addr len io =
     io{mAccessLog = (mAccessLog io){alData = recordRange addr len (alData (mAccessLog io))}}
-recordIo addr len io =
+noteIoAccess addr len io =
     io{mAccessLog = (mAccessLog io){alIo = recordRange addr len (alIo (mAccessLog io))}}
 
 instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMem isa w) isa w where
@@ -239,7 +239,7 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
                 Right (_mIoCells', instr)
                     | ioPortInstructionCollision io idx instr ->
                         Left $ "iomemory[" <> show idx <> "]: instruction in memory corrupted"
-                    | otherwise -> Right (recordInstr idx (byteSize instr) io, instr)
+                    | otherwise -> Right (noteInstrAccess idx (byteSize instr) io, instr)
 
     readByte io@IoMem{mIoByteToWord} idx
         | Just wordIdx <- mIoByteToWord !? idx = do
@@ -247,7 +247,7 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
             return (io', wordSplit word Unsafe.!! (idx - wordIdx))
     readByte io@IoMem{mIoCells} idx = do
         (mIoCells', v) <- readByte mIoCells idx
-        return (recordData idx 1 io{mIoCells = mIoCells'}, v)
+        return (noteDataAccess idx 1 io{mIoCells = mIoCells'}, v)
 
     readWord io idx | ioPortWordCollision io idx = Left $ "iomemory[" <> show idx <> "]: can't read word from input port"
     readWord io@IoMem{mIoStreams, mIoCells} idx = do
@@ -255,28 +255,28 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
             Just ([], _) -> Left $ "iomemory[" <> show idx <> "]: input is depleted"
             Just (i : is, os) -> do
                 let io' = io{mIoStreams = insert idx (is, os) mIoStreams}
-                Right (recordIo idx (byteSizeT @w) io', i)
+                Right (noteIoAccess idx (byteSizeT @w) io', i)
             Nothing -> do
                 (mIoCells', w) <- readWord mIoCells idx
-                return (recordData idx (byteSizeT @w) io{mIoCells = mIoCells'}, w)
+                return (noteDataAccess idx (byteSizeT @w) io{mIoCells = mIoCells'}, w)
 
     writeWord io idx _word | ioPortWordCollision io idx = Left $ "iomemory[" <> show idx <> "]: can't write word to input port"
     writeWord io idx word =
         case mIoStreams io !? idx of
-            Just (is, os) -> Right $ recordIo idx (byteSizeT @w) io{mIoStreams = insert idx (is, word : os) (mIoStreams io)}
+            Just (is, os) -> Right $ noteIoAccess idx (byteSizeT @w) io{mIoStreams = insert idx (is, word : os) (mIoStreams io)}
             Nothing -> do
                 mIoCells' <- writeWord (mIoCells io) idx word
-                return $ recordData idx (byteSizeT @w) io{mIoCells = mIoCells'}
+                return $ noteDataAccess idx (byteSizeT @w) io{mIoCells = mIoCells'}
 
     writeByte io idx _byte
         | ioPortByteCollision io idx =
             Left $ "iomemory[" <> show idx <> "]: can't write byte to input port"
     writeByte io idx byte =
         case mIoStreams io !? idx of
-            Just (is, os) -> Right $ recordIo idx 1 io{mIoStreams = insert idx (is, byteToWord byte : os) (mIoStreams io)}
+            Just (is, os) -> Right $ noteIoAccess idx 1 io{mIoStreams = insert idx (is, byteToWord byte : os) (mIoStreams io)}
             Nothing -> do
                 mIoCells' <- writeByte (mIoCells io) idx byte
-                return $ recordData idx 1 io{mIoCells = mIoCells'}
+                return $ noteDataAccess idx 1 io{mIoCells = mIoCells'}
 
     dumpCells = memoryData . mIoCells
 
