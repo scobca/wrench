@@ -122,12 +122,12 @@ prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount 
         AccessLog{alInstr, alData, alIo} = accessLog (memoryDump finalState)
         resolver v = case v of
             "sim:instruction-count" -> show instrCount
-            "layout:sections" -> show dsSectionsTotalBytes
-            "layout:text-sections" -> show dsTextSectionsBytes
-            "layout:data-sections" -> show dsDataSectionsBytes
-            "mem:instr-range" -> renderIntervals alInstr
-            "mem:data-range" -> renderIntervals alData
-            "mem:io-range" -> renderIntervals alIo
+            "layout:sections-size" -> show dsSectionsTotalBytes
+            "layout:text-sections-size" -> show dsTextSectionsBytes
+            "layout:data-sections-size" -> show dsDataSectionsBytes
+            "mem:instr-ranges" -> renderIntervals alInstr
+            "mem:data-ranges" -> renderIntervals alData
+            "mem:io-ranges" -> renderIntervals alIo
             _ -> reprState labels st v
      in toString $ substituteBrackets resolver line
 

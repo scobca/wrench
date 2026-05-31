@@ -20,18 +20,18 @@ reports:
   - name: stats
     slice: last
     view: |
-      instructions: {sim:instruction-count}
-      sections: {layout:sections}
-      text: {layout:text-sections}
-      data: {layout:data-sections}
-      mem-instr: {mem:instr-range}
-      mem-data: {mem:data-range}
-      mem-io: {mem:io-range}
+      sim:instruction-count: {sim:instruction-count}
+      layout:sections-size: {layout:sections-size}
+      layout:text-sections-size: {layout:text-sections-size}
+      layout:data-sections-size: {layout:data-sections-size}
+      mem:instr-ranges: {mem:instr-ranges}
+      mem:data-ranges: {mem:data-ranges}
+      mem:io-ranges: {mem:io-ranges}
     assert: |
-      instructions: 42
-      sections: 128
-      text: 120
-      data: 8
-      mem-instr: 8..55, 108..127
-      mem-data: 0..7
-      mem-io: 128..135
+      sim:instruction-count: 42
+      layout:sections-size: 128
+      layout:text-sections-size: 120
+      layout:data-sections-size: 8
+      mem:instr-ranges: 8..55, 108..127
+      mem:data-ranges: 0..7
+      mem:io-ranges: 128..135

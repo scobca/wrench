@@ -15,16 +15,16 @@ reports:
   - name: stats
     slice: last
     view: |
-      sections: {layout:sections}
-      text: {layout:text-sections}
-      data: {layout:data-sections}
-      mem-instr: {mem:instr-range}
-      mem-data: {mem:data-range}
-      mem-io: {mem:io-range}
+      layout:sections-size: {layout:sections-size}
+      layout:text-sections-size: {layout:text-sections-size}
+      layout:data-sections-size: {layout:data-sections-size}
+      mem:instr-ranges: {mem:instr-ranges}
+      mem:data-ranges: {mem:data-ranges}
+      mem:io-ranges: {mem:io-ranges}
     assert: |
-      sections: 76
-      text: 68
-      data: 8
-      mem-instr: 0..39, 44..71
-      mem-data: 40..43, 72..75, 508..511
-      mem-io: 128..135
+      layout:sections-size: 76
+      layout:text-sections-size: 68
+      layout:data-sections-size: 8
+      mem:instr-ranges: 0..39, 44..71
+      mem:data-ranges: 40..43, 72..75, 508..511
+      mem:io-ranges: 128..135

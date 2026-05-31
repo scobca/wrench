@@ -93,7 +93,7 @@ numio[0x80]: [] >>> []
 numio[0x84]: [] >>> [120]
 ---
 # stats
-instructions: 87
-mem-instr: 0..75, 140..191
-mem-data: 100..107, 566..597
-mem-io: 128..135
+sim:instruction-count: 87
+mem:instr-ranges: 0..75, 140..191
+mem:data-ranges: 100..107, 566..597
+mem:io-ranges: 128..135
