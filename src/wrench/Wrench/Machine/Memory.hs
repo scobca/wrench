@@ -10,6 +10,7 @@ module Wrench.Machine.Memory (
     prepareDump,
     prettyDump,
     DumpStats (..),
+    computeDumpStats,
 ) where
 
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -33,7 +34,7 @@ data DumpStats = DumpStats
     }
     deriving (Eq, Show)
 
-prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> (Mem isa w, DumpStats)
+prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> Mem isa w
 prepareDump memorySize sections =
     let addSection cells offset dump =
             let dump' = zip [offset ..] cells
@@ -68,24 +69,25 @@ prepareDump memorySize sections =
                     sections
         dumpSize = maximum1 $ 0 :| keys fromSections
         placeholder = map (,Value 0) [0 .. memorySize - 1]
-        textBytes = sum [byteSize s | s@Code{} <- sections]
-        dataBytes = sum [byteSize s | s@Data{} <- sections]
-        stats =
-            DumpStats
-                { dsSectionsTotalBytes = textBytes + dataBytes
-                , dsTextSectionsBytes = textBytes
-                , dsDataSectionsBytes = dataBytes
-                }
      in if dumpSize > memorySize
             then
                 error $ "error: can not fit translation results in memory, need: " <> show dumpSize <> " available: " <> show memorySize
             else
-                ( Mem
+                Mem
                     { memorySize
                     , memoryData = fromList (placeholder <> fromSections)
                     }
-                , stats
-                )
+
+-- | Translation-time layout summary derived from the section list.
+computeDumpStats :: (ByteSize isa, ByteSizeT w) => [Section isa w l] -> DumpStats
+computeDumpStats sections =
+    let textBytes = sum [byteSize s | s@Code{} <- sections]
+        dataBytes = sum [byteSize s | s@Data{} <- sections]
+     in DumpStats
+            { dsSectionsTotalBytes = textBytes + dataBytes
+            , dsTextSectionsBytes = textBytes
+            , dsDataSectionsBytes = dataBytes
+            }
 
 isValue Value{} = True
 isValue _ = False
