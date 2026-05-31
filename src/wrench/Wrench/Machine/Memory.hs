@@ -181,6 +181,14 @@ class Memory m isa w | m -> isa w where
     writeByte :: m -> Int -> Word8 -> Either Text m
     dumpCells :: m -> IntMap (Cell isa w)
 
+    -- | Total addressable bytes.
+    memCapacity :: m -> Int
+
+    -- | Configured memory-mapped IO port starts (each spans one machine word).
+    --   Default empty for memories without IO.
+    ioPorts :: m -> [Int]
+    ioPorts _ = []
+
     -- | Runtime address ranges touched by reads/writes/instruction-fetches.
     --   Default for memories that don't track (e.g. bare 'Mem') is empty.
     accessLog :: m -> AccessLog
@@ -232,6 +240,8 @@ instance
          in Right $ mem{memoryData = memoryData'}
 
     dumpCells Mem{memoryData} = memoryData
+
+    memCapacity Mem{memorySize} = memorySize
 
 ioPortInstructionCollision ::
     forall w isa. (ByteSize isa, Default w, FiniteBits w) => IoMem isa w -> Int -> isa -> Bool
@@ -311,4 +321,6 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
 
     dumpCells = memoryData . mIoCells
 
+    memCapacity = memCapacity . mIoCells
+    ioPorts = mIoKeys
     accessLog = mAccessLog
