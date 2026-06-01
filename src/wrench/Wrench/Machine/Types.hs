@@ -11,6 +11,7 @@ module Wrench.Machine.Types (
     emptyIntervals,
     recordRange,
     renderIntervals,
+    renderIntervalsHex,
     AccessLog (..),
     emptyAccessLog,
     MachineWord,
@@ -35,6 +36,7 @@ import Data.Interval qualified as I
 import Data.IntervalSet (IntervalSet)
 import Data.IntervalSet qualified as IS
 import Data.Text qualified as T
+import Numeric (showHex)
 import Relude
 import Relude.Extra (keys)
 
@@ -249,9 +251,10 @@ recordRange addr len (Intervals s) =
         hi = I.Finite (toInteger (addr + len))
      in Intervals (IS.insert (lo I.<=..< hi) s)
 
--- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty).
-renderIntervals :: Intervals -> Text
-renderIntervals (Intervals s) =
+-- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty),
+--   using the given per-address formatter for both bounds.
+renderIntervalsWith :: (Integer -> Text) -> Intervals -> Text
+renderIntervalsWith fmt (Intervals s) =
     case IS.toAscList s of
         [] -> "-"
         is -> T.intercalate ", " (map renderInterval is)
@@ -259,7 +262,15 @@ renderIntervals (Intervals s) =
         renderInterval i =
             let lo = case I.lowerBound i of I.Finite n -> n; _ -> error "Intervals: unexpected infinite lower bound"
                 hi = case I.upperBound i of I.Finite n -> n - 1; _ -> error "Intervals: unexpected infinite upper bound"
-             in show lo <> ".." <> show hi
+             in fmt lo <> ".." <> fmt hi
+
+-- | Decimal-formatted ranges.
+renderIntervals :: Intervals -> Text
+renderIntervals = renderIntervalsWith show
+
+-- | Hex-formatted ranges (@0xNN@ lowercase, no padding).
+renderIntervalsHex :: Intervals -> Text
+renderIntervalsHex = renderIntervalsWith (\n -> "0x" <> T.pack (showHex n ""))
 
 -- | Runtime access ranges accumulated by 'IoMem' while the program runs.
 data AccessLog = AccessLog

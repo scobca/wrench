@@ -120,15 +120,21 @@ selectSlice LastSlice = take 1 . reverse
 prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount st =
     let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
         AccessLog{alInstr, alData, alIo} = accessLog (memoryDump finalState)
-        resolver v = case v of
-            "sim:instruction-count" -> show instrCount
-            "layout:sections-size" -> show dsSectionsTotalBytes
-            "layout:text-sections-size" -> show dsTextSectionsBytes
-            "layout:data-sections-size" -> show dsDataSectionsBytes
-            "mem:instr-ranges" -> renderIntervals alInstr
-            "mem:data-ranges" -> renderIntervals alData
-            "mem:io-ranges" -> renderIntervals alIo
+        resolver v = case T.splitOn ":" v of
+            ["sim", "instruction-count"] -> show instrCount
+            ["layout", "sections-size"] -> show dsSectionsTotalBytes
+            ["layout", "text-sections-size"] -> show dsTextSectionsBytes
+            ["layout", "data-sections-size"] -> show dsDataSectionsBytes
+            ["mem", "instr-ranges"] -> renderIntervalsHex alInstr
+            ["mem", "instr-ranges", fmt] -> rangesFmt fmt alInstr
+            ["mem", "data-ranges"] -> renderIntervalsHex alData
+            ["mem", "data-ranges", fmt] -> rangesFmt fmt alData
+            ["mem", "io-ranges"] -> renderIntervalsHex alIo
+            ["mem", "io-ranges", fmt] -> rangesFmt fmt alIo
             _ -> reprState labels st v
+        rangesFmt "dec" = renderIntervals
+        rangesFmt "hex" = renderIntervalsHex
+        rangesFmt fmt = const (unknownFormat fmt)
      in toString $ substituteBrackets resolver line
 
 defaultView ::

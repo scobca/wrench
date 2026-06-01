@@ -25,6 +25,6 @@ reports:
       layout:sections-size: 84
       layout:text-sections-size: 76
       layout:data-sections-size: 8
-      mem:instr-ranges: 0..39, 64..91
-      mem:data-ranges: 40..43, 100..103, 508..511
-      mem:io-ranges: 128..135
+      mem:instr-ranges: 0x0..0x27, 0x40..0x5b
+      mem:data-ranges: 0x28..0x2b, 0x64..0x67, 0x1fc..0x1ff
+      mem:io-ranges: 0x80..0x87
