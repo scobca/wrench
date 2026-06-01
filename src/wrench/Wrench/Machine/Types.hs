@@ -7,6 +7,13 @@ module Wrench.Machine.Types (
     Cell (..),
     InitState (..),
     StateInterspector (..),
+    Intervals (..),
+    emptyIntervals,
+    recordRange,
+    renderIntervals,
+    renderIntervalsHex,
+    AccessLog (..),
+    emptyAccessLog,
     MachineWord,
     FromSign (..),
     RegisterId,
@@ -25,6 +32,11 @@ module Wrench.Machine.Types (
 
 import Data.Bits
 import Data.Default (Default, def)
+import Data.Interval qualified as I
+import Data.IntervalSet (IntervalSet)
+import Data.IntervalSet qualified as IS
+import Data.Text qualified as T
+import Numeric (showHex)
 import Relude
 import Relude.Extra (keys)
 
@@ -172,7 +184,13 @@ halted :: Text
 halted = "halted"
 
 data Trace st isa
-    = TState st
+    = -- | A captured machine state, tagged with the 1-indexed instruction step
+      --   number it sits before (i.e. the @sim:instruction-count@ value at this
+      --   point in the trace).
+      TState
+        { tInstructionCount :: !Int
+        , tState :: !st
+        }
     | TError Text
     | TWarn Text
     deriving (Show)
@@ -188,6 +206,8 @@ data IoMem isa w = IoMem
     , mIoCells :: Mem isa w
     , mIoKeys :: [Int]
     , mIoByteToWord :: IntMap Int
+    , mAccessLog :: !AccessLog
+    -- ^ Tracks the address ranges touched at runtime, surfaced via @mem:*@.
     }
     deriving (Eq, Show)
 
@@ -197,6 +217,7 @@ mkIoMem streams cells =
         { mIoStreams = streams
         , mIoCells = cells
         , mIoKeys = keys streams
+        , mAccessLog = emptyAccessLog
         , mIoByteToWord =
             fromList $ concatMap (\i -> map (,i) [i .. i + byteSizeT @w - 1]) (keys streams)
         }
@@ -206,3 +227,61 @@ data Cell isa w
     | InstructionPart
     | Value Word8
     deriving (Eq, Show)
+
+-----------------------------------------------------------
+-- Address-range accounting (mem:* stats)
+
+-- | Sorted, non-overlapping integer address ranges with adjacency merging.
+--   Backed by 'IntervalSet' 'Integer' from the @data-interval@ package.
+--
+--   We store each access as the half-open interval @[lo, hi+1)@ so that two
+--   integer-adjacent accesses (one ending at N, the next starting at N+1)
+--   share a boundary and get merged by 'IS.insert'. On render we convert
+--   back to the inclusive @"lo..hi"@ form by subtracting 1 from the upper.
+newtype Intervals = Intervals {unIntervals :: IntervalSet Integer}
+    deriving (Eq, Show)
+
+emptyIntervals :: Intervals
+emptyIntervals = Intervals IS.empty
+
+-- | Record an access spanning @[addr .. addr+len-1]@. Length must be ≥ 1.
+recordRange :: Int -> Int -> Intervals -> Intervals
+recordRange addr len (Intervals s) =
+    let lo = I.Finite (toInteger addr)
+        hi = I.Finite (toInteger (addr + len))
+     in Intervals (IS.insert (lo I.<=..< hi) s)
+
+-- | Render intervals as @"lo1..hi1, lo2..hi2"@ (or @"-"@ when empty),
+--   using the given per-address formatter for both bounds.
+renderIntervalsWith :: (Integer -> Text) -> Intervals -> Text
+renderIntervalsWith fmt (Intervals s) =
+    case IS.toAscList s of
+        [] -> "-"
+        is -> T.intercalate ", " (map renderInterval is)
+    where
+        renderInterval i =
+            let lo = case I.lowerBound i of I.Finite n -> n; _ -> error "Intervals: unexpected infinite lower bound"
+                hi = case I.upperBound i of I.Finite n -> n - 1; _ -> error "Intervals: unexpected infinite upper bound"
+             in fmt lo <> ".." <> fmt hi
+
+-- | Decimal-formatted ranges.
+renderIntervals :: Intervals -> Text
+renderIntervals = renderIntervalsWith show
+
+-- | Hex-formatted ranges (@0xNN@ lowercase, no padding).
+renderIntervalsHex :: Intervals -> Text
+renderIntervalsHex = renderIntervalsWith (\n -> "0x" <> T.pack (showHex n ""))
+
+-- | Runtime access ranges accumulated by 'IoMem' while the program runs.
+data AccessLog = AccessLog
+    { alInstr :: !Intervals
+    -- ^ Instruction-fetch addresses.
+    , alData :: !Intervals
+    -- ^ Data read/write addresses (merged — we don't distinguish direction).
+    , alIo :: !Intervals
+    -- ^ Memory-mapped IO addresses touched.
+    }
+    deriving (Eq, Show)
+
+emptyAccessLog :: AccessLog
+emptyAccessLog = AccessLog{alInstr = emptyIntervals, alData = emptyIntervals, alIo = emptyIntervals}

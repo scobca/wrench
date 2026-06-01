@@ -1,0 +1,12 @@
+---
+# result
+numio[0x80]: [] >>> []
+numio[0x84]: [] >>> [7]
+---
+# stats
+layout:sections-size: 84
+layout:text-sections-size: 76
+layout:data-sections-size: 8
+mem:instr-ranges: 0x0..0x27, 0x40..0x5b
+mem:data-ranges: 0x28..0x2b, 0x64..0x67, 0x1fc..0x1ff
+mem:io-ranges: 0x80..0x87

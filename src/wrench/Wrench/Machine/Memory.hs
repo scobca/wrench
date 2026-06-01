@@ -9,6 +9,8 @@ module Wrench.Machine.Memory (
     word32ToHex,
     prepareDump,
     prettyDump,
+    DumpStats (..),
+    computeDumpStats,
 ) where
 
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -19,6 +21,18 @@ import Relude.Extra
 import Relude.Unsafe qualified as Unsafe
 import Wrench.Machine.Types
 import Wrench.Translator.Types
+
+-- | Translation-time memory layout statistics, surfaced to report views via the
+--   @layout:*@ namespace.
+data DumpStats = DumpStats
+    { dsSectionsTotalBytes :: !Int
+    -- ^ Sum of byte sizes of all sections (no .org gaps).
+    , dsTextSectionsBytes :: !Int
+    -- ^ Sum of byte sizes of code (text) sections only.
+    , dsDataSectionsBytes :: !Int
+    -- ^ Sum of byte sizes of data sections only.
+    }
+    deriving (Eq, Show)
 
 prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> Mem isa w
 prepareDump memorySize sections =
@@ -63,6 +77,17 @@ prepareDump memorySize sections =
                     { memorySize
                     , memoryData = fromList (placeholder <> fromSections)
                     }
+
+-- | Translation-time layout summary derived from the section list.
+computeDumpStats :: (ByteSize isa, ByteSizeT w) => [Section isa w l] -> DumpStats
+computeDumpStats sections =
+    let textBytes = sum [byteSize s | s@Code{} <- sections]
+        dataBytes = sum [byteSize s | s@Data{} <- sections]
+     in DumpStats
+            { dsSectionsTotalBytes = textBytes + dataBytes
+            , dsTextSectionsBytes = textBytes
+            , dsDataSectionsBytes = dataBytes
+            }
 
 isValue Value{} = True
 isValue _ = False
@@ -118,18 +143,23 @@ word32ToHex w =
      in "0x" <> replicate (8 - length hex) '0' <> hex
 
 class Memory m isa w | m -> isa w where
-    readInstruction :: m -> Int -> Either Text isa
+    readInstruction :: m -> Int -> Either Text (m, isa)
     readWord :: m -> Int -> Either Text (m, w)
     readByte :: m -> Int -> Either Text (m, Word8)
     writeWord :: m -> Int -> w -> Either Text m
     writeByte :: m -> Int -> Word8 -> Either Text m
     dumpCells :: m -> IntMap (Cell isa w)
 
+    -- | Runtime address ranges touched by reads/writes/instruction-fetches.
+    --   Default for memories that don't track (e.g. bare 'Mem') is empty.
+    accessLog :: m -> AccessLog
+    accessLog _ = emptyAccessLog
+
 instance
     (ByteSize isa, MachineWord w) =>
     Memory (Mem isa w) isa w
     where
-    readInstruction Mem{memoryData} idx =
+    readInstruction mem@Mem{memoryData} idx =
         case memoryData !? idx of
             Just (Instruction i)
                 | all
@@ -138,7 +168,7 @@ instance
                         _ -> False
                     )
                     [idx + 1 .. idx + byteSize i - 1] ->
-                    Right i
+                    Right (mem, i)
                 | otherwise -> Left $ "memory[" <> show idx <> "]: instruction in memory corrupted"
             Just InstructionPart -> Left $ "memory[" <> show idx <> "]: instruction in memory corrupted"
             Just (Value _) -> Left $ "memory[" <> show idx <> "]: can't read instruction from data cell"
@@ -192,16 +222,24 @@ ioPortByteCollision IoMem{mIoKeys} addr =
         parts = concatMap mkParts mIoKeys
      in (addr `elem` parts)
 
+noteInstrAccess, noteDataAccess, noteIoAccess :: Int -> Int -> IoMem isa w -> IoMem isa w
+noteInstrAccess addr len io =
+    io{mAccessLog = (mAccessLog io){alInstr = recordRange addr len (alInstr (mAccessLog io))}}
+noteDataAccess addr len io =
+    io{mAccessLog = (mAccessLog io){alData = recordRange addr len (alData (mAccessLog io))}}
+noteIoAccess addr len io =
+    io{mAccessLog = (mAccessLog io){alIo = recordRange addr len (alIo (mAccessLog io))}}
+
 instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMem isa w) isa w where
     readInstruction io@IoMem{mIoStreams, mIoCells} idx =
         case mIoStreams !? idx of
             Just _ -> Left $ "iomemory[" <> show idx <> "]: instruction in memory corrupted"
             Nothing -> case readInstruction mIoCells idx of
                 Left err -> Left err
-                Right instr
+                Right (_mIoCells', instr)
                     | ioPortInstructionCollision io idx instr ->
                         Left $ "iomemory[" <> show idx <> "]: instruction in memory corrupted"
-                    | otherwise -> Right instr
+                    | otherwise -> Right (noteInstrAccess idx (byteSize instr) io, instr)
 
     readByte io@IoMem{mIoByteToWord} idx
         | Just wordIdx <- mIoByteToWord !? idx = do
@@ -209,7 +247,7 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
             return (io', wordSplit word Unsafe.!! (idx - wordIdx))
     readByte io@IoMem{mIoCells} idx = do
         (mIoCells', v) <- readByte mIoCells idx
-        return (io{mIoCells = mIoCells'}, v)
+        return (noteDataAccess idx 1 io{mIoCells = mIoCells'}, v)
 
     readWord io idx | ioPortWordCollision io idx = Left $ "iomemory[" <> show idx <> "]: can't read word from input port"
     readWord io@IoMem{mIoStreams, mIoCells} idx = do
@@ -217,27 +255,29 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
             Just ([], _) -> Left $ "iomemory[" <> show idx <> "]: input is depleted"
             Just (i : is, os) -> do
                 let io' = io{mIoStreams = insert idx (is, os) mIoStreams}
-                Right (io', i)
+                Right (noteIoAccess idx (byteSizeT @w) io', i)
             Nothing -> do
                 (mIoCells', w) <- readWord mIoCells idx
-                return (io{mIoCells = mIoCells'}, w)
+                return (noteDataAccess idx (byteSizeT @w) io{mIoCells = mIoCells'}, w)
 
     writeWord io idx _word | ioPortWordCollision io idx = Left $ "iomemory[" <> show idx <> "]: can't write word to input port"
     writeWord io idx word =
         case mIoStreams io !? idx of
-            Just (is, os) -> Right io{mIoStreams = insert idx (is, word : os) (mIoStreams io)}
+            Just (is, os) -> Right $ noteIoAccess idx (byteSizeT @w) io{mIoStreams = insert idx (is, word : os) (mIoStreams io)}
             Nothing -> do
                 mIoCells' <- writeWord (mIoCells io) idx word
-                return io{mIoCells = mIoCells'}
+                return $ noteDataAccess idx (byteSizeT @w) io{mIoCells = mIoCells'}
 
     writeByte io idx _byte
         | ioPortByteCollision io idx =
             Left $ "iomemory[" <> show idx <> "]: can't write byte to input port"
     writeByte io idx byte =
         case mIoStreams io !? idx of
-            Just (is, os) -> Right io{mIoStreams = insert idx (is, byteToWord byte : os) (mIoStreams io)}
+            Just (is, os) -> Right $ noteIoAccess idx 1 io{mIoStreams = insert idx (is, byteToWord byte : os) (mIoStreams io)}
             Nothing -> do
                 mIoCells' <- writeByte (mIoCells io) idx byte
-                return io{mIoCells = mIoCells'}
+                return $ noteDataAccess idx 1 io{mIoCells = mIoCells'}
 
     dumpCells = memoryData . mIoCells
+
+    accessLog = mAccessLog

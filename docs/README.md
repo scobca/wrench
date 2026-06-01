@@ -290,6 +290,33 @@ General state view expressions implemented for all ISAs:
 - `memory:<a>:<b>` -- Print memory dump between addresses `<a>` and `<b>`.
 - `io:<a>:dec`, `io:<a>:sym`, `io:<a>:hex` -- Print input-output stream state for the specific address in decimal, symbol, or hexadecimal format. Printable char codes: [32, 126]. Also `\0`, `\n` will be printed as is. Other non-printable characters will be replaced with `?`.
 
+Execution and memory statistics. These are typically used with `slice: last` to emit one final summary line; the values are the totals for the whole run.
+
+- `sim:instruction-count` -- Number of instructions executed so far. With `slice: all` it shows the running step counter (1, 2, ...); with `slice: last` it shows the total for the run.
+- `layout:sections-size` -- Sum of byte sizes of all sections (no gaps from `.org`).
+- `layout:text-sections-size`, `layout:data-sections-size` -- Same, split by section kind.
+- `mem:instr-ranges` -- Address ranges of instruction fetches at runtime, rendered as comma-separated `lo..hi` clusters (e.g. `0x0..0x4b, 0x8c..0xbf`). Addresses are hex by default; append `:dec` or `:hex` to override (e.g. `{mem:instr-ranges:dec}` -> `0..75, 140..191`).
+- `mem:data-ranges` -- Address ranges of data reads and writes (merged into one set). Same `:dec`/`:hex` suffix.
+- `mem:io-ranges` -- Address ranges of memory-mapped IO accesses. Same `:dec`/`:hex` suffix.
+
+Example -- print a stats summary after the simulation finishes:
+
+```yaml
+reports:
+    - name: stats
+      slice: last
+      view: |
+        sim:instruction-count:     {sim:instruction-count}
+        layout:sections-size:      {layout:sections-size}
+        layout:text-sections-size: {layout:text-sections-size}
+        layout:data-sections-size: {layout:data-sections-size}
+        mem:instr-ranges:          {mem:instr-ranges}
+        mem:data-ranges:           {mem:data-ranges}
+        mem:io-ranges:             {mem:io-ranges}
+```
+
+Comparing `layout:*-size` with `mem:*-ranges` reveals which declared bytes the program actually touched and which addresses it accessed outside any declared section -- the stack region is a typical example.
+
 For ISA-specific state views, see the respective architecture documentation.
 
 ##### `assert`

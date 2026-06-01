@@ -55,6 +55,7 @@ instance FromJSON ReportConf where
 prepareReport
     trResult@TranslatorResult{}
     verbose
+    finalState
     records
     rc@ReportConf{rcName, rcSlice, rcAssert, rcView} =
         let header = maybe "" ("# " <>) rcName
@@ -67,7 +68,8 @@ prepareReport
                         $ filter (not . null)
                         $ map
                             ( \case
-                                (TState st) -> prepareStateView rvView' trResult st
+                                TState{tInstructionCount, tState} ->
+                                    prepareStateView rvView' trResult finalState tInstructionCount tState
                                 (TError err) -> "ERROR: " <> toString err <> "\n"
                                 (TWarn warn) -> "WARN: " <> toString warn <> "\n"
                             )
@@ -115,8 +117,25 @@ selectSlice LastSlice = take 1 . reverse
 
 -----------------------------------------------------------
 
-prepareStateView line TranslatorResult{labels} st =
-    toString $ substituteBrackets (reprState labels st) line
+prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount st =
+    let DumpStats{dsSectionsTotalBytes, dsTextSectionsBytes, dsDataSectionsBytes} = dumpStats
+        AccessLog{alInstr, alData, alIo} = accessLog (memoryDump finalState)
+        resolver v = case T.splitOn ":" v of
+            ["sim", "instruction-count"] -> show instrCount
+            ["layout", "sections-size"] -> show dsSectionsTotalBytes
+            ["layout", "text-sections-size"] -> show dsTextSectionsBytes
+            ["layout", "data-sections-size"] -> show dsDataSectionsBytes
+            ["mem", "instr-ranges"] -> renderIntervalsHex alInstr
+            ["mem", "instr-ranges", fmt] -> rangesFmt fmt alInstr
+            ["mem", "data-ranges"] -> renderIntervalsHex alData
+            ["mem", "data-ranges", fmt] -> rangesFmt fmt alData
+            ["mem", "io-ranges"] -> renderIntervalsHex alIo
+            ["mem", "io-ranges", fmt] -> rangesFmt fmt alIo
+            _ -> reprState labels st v
+        rangesFmt "dec" = renderIntervals
+        rangesFmt "hex" = renderIntervalsHex
+        rangesFmt fmt = const (unknownFormat fmt)
+     in toString $ substituteBrackets resolver line
 
 defaultView ::
     (ByteSize isa, MachineWord w, Memory m isa w, Show isa, StateInterspector st m isa w) =>
@@ -129,7 +148,7 @@ defaultView labels st "pc:label" =
         (l, _a) : _ -> "@" <> toText l
         _ -> ""
 defaultView _labels st "instruction" =
-    Just $ either error show (readInstruction (memoryDump st) (programCounter st))
+    Just $ either error (show . snd) (readInstruction (memoryDump st) (programCounter st))
 defaultView labels st v =
     case T.splitOn ":" v of
         ["pc"] -> Just $ reprState labels st "pc:dec"

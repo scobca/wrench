@@ -18,6 +18,7 @@ import Wrench.Translator.Types
 data TranslatorResult mem w = TranslatorResult
     { dump :: !mem
     , labels :: !(HashMap String w)
+    , dumpStats :: !DumpStats
     }
     deriving (Show)
 
@@ -84,5 +85,6 @@ translate memorySize fn src =
                     let resolveLabel l = (labels !? l)
                         code = map (uncurry (derefSection resolveLabel)) (markupSectionOffsets 0 sections)
                         dump = prepareDump memorySize code
-                     in Right $ TranslatorResult dump labels
+                        stats = computeDumpStats code
+                     in Right $ TranslatorResult dump labels stats
         Left err -> Left $ toText $ errorBundlePretty err

@@ -106,6 +106,24 @@ See our [documentation](./docs/README.md) for detailed information about:
 - Configuration file format and options
 - Architecture-specific details
 
+### Execution and memory statistics
+
+Reports can include opt-in stat variables that summarize the run -- instructions executed, declared section sizes, and the address ranges actually touched at runtime. Add them to any report's `view` template (typically with `slice: last`):
+
+```yaml
+reports:
+    - name: stats
+      slice: last
+      view: |
+        sim:instruction-count: {sim:instruction-count}
+        layout:sections-size:  {layout:sections-size}
+        mem:instr-ranges:      {mem:instr-ranges}
+        mem:data-ranges:       {mem:data-ranges}
+        mem:io-ranges:         {mem:io-ranges}
+```
+
+Comparing `layout:*-size` against `mem:*-ranges` shows which declared bytes the program actually touched and which addresses it accessed outside any declared section (the stack region is the typical case). The full list of variables, including byte-count vs. range conventions, is in the [configuration documentation](./docs/README.md#view).
+
 ## Examples
 
 ### Factorial Calculation Example (RISC-IV)
