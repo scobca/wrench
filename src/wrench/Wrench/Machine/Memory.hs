@@ -31,6 +31,10 @@ data DumpStats = DumpStats
     -- ^ Sum of byte sizes of code (text) sections only.
     , dsDataSectionsBytes :: !Int
     -- ^ Sum of byte sizes of data sections only.
+    , dsTextIntervals :: !Intervals
+    -- ^ Address ranges of all code (text) sections.
+    , dsDataIntervals :: !Intervals
+    -- ^ Address ranges of all data sections.
     }
     deriving (Eq, Show)
 
@@ -83,14 +87,41 @@ computeDumpStats :: (ByteSize isa, ByteSizeT w) => [Section isa w l] -> DumpStat
 computeDumpStats sections =
     let textBytes = sum [byteSize s | s@Code{} <- sections]
         dataBytes = sum [byteSize s | s@Data{} <- sections]
+        sectionRanges = walkSectionRanges 0 sections
+        textIntervals =
+            foldr
+                (\(s, lo) acc -> if isText s && byteSize s > 0 then recordRange lo (byteSize s) acc else acc)
+                emptyIntervals
+                sectionRanges
+        dataIntervals =
+            foldr
+                (\(s, lo) acc -> if isData s && byteSize s > 0 then recordRange lo (byteSize s) acc else acc)
+                emptyIntervals
+                sectionRanges
      in DumpStats
             { dsSectionsTotalBytes = textBytes + dataBytes
             , dsTextSectionsBytes = textBytes
             , dsDataSectionsBytes = dataBytes
+            , dsTextIntervals = textIntervals
+            , dsDataIntervals = dataIntervals
             }
 
 isValue Value{} = True
 isValue _ = False
+
+isText, isData :: Section isa w l -> Bool
+isText Code{} = True
+isText _ = False
+isData Data{} = True
+isData _ = False
+
+-- | Resolve each section's starting offset (respecting @.org@) and pair it
+--   with the section itself, in source order.
+walkSectionRanges :: (ByteSize isa, ByteSizeT w) => Int -> [Section isa w l] -> [(Section isa w l, Int)]
+walkSectionRanges _ [] = []
+walkSectionRanges offset (s : rest) =
+    let start = fromMaybe offset (org s)
+     in (s, start) : walkSectionRanges (start + byteSize s) rest
 
 sliceMem :: [Int] -> IntMap (Cell isa w) -> [(Int, Cell isa w)]
 sliceMem addrs memoryData = map (\a -> (a, Unsafe.fromJust (memoryData !? a))) addrs
@@ -150,6 +181,14 @@ class Memory m isa w | m -> isa w where
     writeByte :: m -> Int -> Word8 -> Either Text m
     dumpCells :: m -> IntMap (Cell isa w)
 
+    -- | Total addressable bytes.
+    memCapacity :: m -> Int
+
+    -- | Configured memory-mapped IO port starts (each spans one machine word).
+    --   Default empty for memories without IO.
+    ioPorts :: m -> [Int]
+    ioPorts _ = []
+
     -- | Runtime address ranges touched by reads/writes/instruction-fetches.
     --   Default for memories that don't track (e.g. bare 'Mem') is empty.
     accessLog :: m -> AccessLog
@@ -201,6 +240,8 @@ instance
          in Right $ mem{memoryData = memoryData'}
 
     dumpCells Mem{memoryData} = memoryData
+
+    memCapacity Mem{memorySize} = memorySize
 
 ioPortInstructionCollision ::
     forall w isa. (ByteSize isa, Default w, FiniteBits w) => IoMem isa w -> Int -> isa -> Bool
@@ -280,4 +321,6 @@ instance (ByteSize isa, MachineWord w, Memory (Mem isa w) isa w) => Memory (IoMe
 
     dumpCells = memoryData . mIoCells
 
+    memCapacity = memCapacity . mIoCells
+    ioPorts = mIoKeys
     accessLog = mAccessLog

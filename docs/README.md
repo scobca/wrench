@@ -295,9 +295,12 @@ Execution and memory statistics. These are typically used with `slice: last` to 
 - `sim:instruction-count` -- Number of instructions executed so far. With `slice: all` it shows the running step counter (1, 2, ...); with `slice: last` it shows the total for the run.
 - `layout:sections-size` -- Sum of byte sizes of all sections (no gaps from `.org`).
 - `layout:text-sections-size`, `layout:data-sections-size` -- Same, split by section kind.
+- `layout:text-ranges` -- Address ranges of all declared `.text` sections (e.g. `0x0..0x27, 0x40..0x5b`). Hex by default; `:dec` / `:hex` suffix to override.
+- `layout:data-ranges` -- Address ranges of all declared `.data` sections. Same `:dec`/`:hex` suffix.
 - `mem:instr-ranges` -- Address ranges of instruction fetches at runtime, rendered as comma-separated `lo..hi` clusters (e.g. `0x0..0x4b, 0x8c..0xbf`). Addresses are hex by default; append `:dec` or `:hex` to override (e.g. `{mem:instr-ranges:dec}` -> `0..75, 140..191`).
 - `mem:data-ranges` -- Address ranges of data reads and writes (merged into one set). Same `:dec`/`:hex` suffix.
 - `mem:io-ranges` -- Address ranges of memory-mapped IO accesses. Same `:dec`/`:hex` suffix.
+- `memory:table` -- Multi-line address-space table that puts the above together: one row per declared `text`/`data` section, one per IO cluster, and `x` rows for free regions (split at access boundaries, so the stack gets its own row). Columns: `Kind`, `Range`, `Bytes`, `Accessed`, `Coverage`. The `Bytes` column sums to `memory_size` as a built-in sanity check.
 
 Example -- print a stats summary after the simulation finishes:
 
@@ -316,6 +319,20 @@ reports:
 ```
 
 Comparing `layout:*-size` with `mem:*-ranges` reveals which declared bytes the program actually touched and which addresses it accessed outside any declared section -- the stack region is a typical example.
+
+For the same picture in one shot, use `{memory:table}` -- it walks the whole address space and renders one row per section / IO cluster / free span. A typical output looks like:
+
+```text
+Kind  Range         Bytes  Accessed                    Coverage
+text  0x000..0x027     40  0x000..0x027                    100%
+data  0x028..0x02B      4  0x028..0x02B                    100%
+x     0x02C..0x07F     84  -                                 0%
+io    0x080..0x087      8  0x080..0x087                    100%
+text  0x090..0x0E3     84  0x090..0x0E3                    100%
+data  0x0E4..0x0F9     22  0x0E4..0x0EE, 0x0F5..0x0F9       72%   <- partial: middle bytes untouched
+x     0x1FC..0x1FF      4  0x1FC..0x1FF                    100%  <- undeclared use (stack)
+x     0x200..0x2FF    256  -                                 0%
+```
 
 For ISA-specific state views, see the respective architecture documentation.
 

@@ -12,6 +12,13 @@ module Wrench.Machine.Types (
     recordRange,
     renderIntervals,
     renderIntervalsHex,
+    inIntervals,
+    intervalsSize,
+    intervalsToList,
+    intervalsRange,
+    intervalsIntersect,
+    intervalsUnion,
+    intervalsDifference,
     AccessLog (..),
     emptyAccessLog,
     MachineWord,
@@ -271,6 +278,46 @@ renderIntervals = renderIntervalsWith show
 -- | Hex-formatted ranges (@0xNN@ lowercase, no padding).
 renderIntervalsHex :: Intervals -> Text
 renderIntervalsHex = renderIntervalsWith (\n -> "0x" <> T.pack (showHex n ""))
+
+-- | Membership test: is @addr@ inside any interval?
+inIntervals :: Int -> Intervals -> Bool
+inIntervals addr (Intervals s) = IS.member (toInteger addr) s
+
+-- | Total number of bytes covered by all intervals.
+intervalsSize :: Intervals -> Int
+intervalsSize (Intervals s) =
+    fromInteger
+        $ sum
+            [ hi - lo
+            | i <- IS.toAscList s
+            , I.Finite lo <- [I.lowerBound i]
+            , I.Finite hi <- [I.upperBound i]
+            ]
+
+-- | Convert intervals back to a list of inclusive @(lo, hi)@ pairs in
+--   ascending order.
+intervalsToList :: Intervals -> [(Int, Int)]
+intervalsToList (Intervals s) =
+    [ (fromInteger lo, fromInteger (hi - 1))
+    | i <- IS.toAscList s
+    , I.Finite lo <- [I.lowerBound i]
+    , I.Finite hi <- [I.upperBound i]
+    ]
+
+-- | Build an 'Intervals' covering the inclusive range @[lo, hi]@.
+intervalsRange :: Int -> Int -> Intervals
+intervalsRange lo hi
+    | hi < lo = emptyIntervals
+    | otherwise = recordRange lo (hi - lo + 1) emptyIntervals
+
+intervalsIntersect :: Intervals -> Intervals -> Intervals
+intervalsIntersect (Intervals a) (Intervals b) = Intervals (IS.intersection a b)
+
+intervalsUnion :: Intervals -> Intervals -> Intervals
+intervalsUnion (Intervals a) (Intervals b) = Intervals (IS.union a b)
+
+intervalsDifference :: Intervals -> Intervals -> Intervals
+intervalsDifference (Intervals a) (Intervals b) = Intervals (IS.difference a b)
 
 -- | Runtime access ranges accumulated by 'IoMem' while the program runs.
 data AccessLog = AccessLog
