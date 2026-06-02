@@ -12,3 +12,11 @@ reports:
       numio[0x84]: {io:0x84:dec}
       symio[0x80]: {io:0x80:sym}
       symio[0x84]: {io:0x84:sym}
+  - name: vliw-load
+    slice: last
+    view: |
+      vliw:load-percent:    {vliw:load-percent}
+      vliw:bundles-by-load: {vliw:bundles-by-load}
+    assert: |
+      vliw:load-percent:    81%
+      vliw:bundles-by-load: 1:3 (9%), 3:16 (48%), 4:14 (42%)

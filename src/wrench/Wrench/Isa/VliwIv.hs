@@ -9,6 +9,8 @@ module Wrench.Isa.VliwIv (
     MachineState (..),
     VliwIvState,
     Register (..),
+    VliwLoadAcc,
+    emptyVliwLoad,
 ) where
 
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
@@ -169,6 +171,60 @@ data Isa w l = Isa
     , ctrlOp :: ControlOp w l
     }
     deriving (Show)
+
+-- * Load-level accumulator
+
+-- | Per-run histogram of how many slots were active in each executed bundle.
+--   @vlByLoad@ maps active-slot count (0..4) to the number of bundles with
+--   that load. Used by the @vliw:*@ report variables to summarise how well
+--   the program exploits the four-wide pipeline.
+newtype VliwLoadAcc = VliwLoadAcc {vlByLoad :: IntMap Int}
+    deriving (Eq, Show)
+
+emptyVliwLoad :: VliwLoadAcc
+emptyVliwLoad = VliwLoadAcc mempty
+
+isMemActive :: MemoryOp w l -> Bool
+isMemActive NopM = False
+isMemActive _ = True
+
+isAluActive :: AluOp w l -> Bool
+isAluActive NopA = False
+isAluActive _ = True
+
+isCtrlActive :: ControlOp w l -> Bool
+isCtrlActive NopC = False
+isCtrlActive _ = True
+
+bundleActiveCount :: Isa w l -> Int
+bundleActiveCount Isa{memOp, alu1Op, alu2Op, ctrlOp} =
+    bool 0 1 (isMemActive memOp)
+        + bool 0 1 (isAluActive alu1Op)
+        + bool 0 1 (isAluActive alu2Op)
+        + bool 0 1 (isCtrlActive ctrlOp)
+
+recordBundle :: Isa w l -> VliwLoadAcc -> VliwLoadAcc
+recordBundle isa (VliwLoadAcc m) =
+    VliwLoadAcc $ alter (Just . maybe 1 (+ 1)) (bundleActiveCount isa) m
+
+vliwLoadPercent :: VliwLoadAcc -> Int
+vliwLoadPercent (VliwLoadAcc m) =
+    let total = sum m
+        active = sum [k * n | (k, n) <- toPairs m]
+     in if total == 0 then 0 else (active * 100) `div` (total * 4)
+
+-- | Render the per-load histogram as @"K:N (P%)"@ pairs separated by commas,
+--   one per non-empty bucket. @K@ is the active-slot count, @N@ is the
+--   number of bundles in that bucket, @P@ is its percent share of executed
+--   bundles. Empty buckets are omitted; an empty histogram renders as @"-"@.
+renderBundlesByLoad :: VliwLoadAcc -> Text
+renderBundlesByLoad (VliwLoadAcc m) =
+    let nonZero = [(k, n) | k <- [0 .. 4 :: Int], let n = lookupDefault 0 k m, n > 0]
+        total = sum (map snd nonZero)
+        pct n = if total == 0 then 0 else (n * 100) `div` total
+        fmt (k, n) =
+            (show k :: Text) <> ":" <> show n <> " (" <> show (pct n) <> "%)"
+     in if null nonZero then "-" else T.intercalate ", " (map fmt nonZero)
 
 -- * Parser Helpers
 
@@ -371,6 +427,7 @@ data MachineState mem w = State
     , stopped :: Bool
     , internalError :: Maybe Text
     , randoms :: [Int]
+    , vliwLoad :: !VliwLoadAcc
     }
     deriving (Show)
 
@@ -446,6 +503,7 @@ instance (MachineWord w) => InitState (IoMem (Isa w w) w) (MachineState (IoMem (
             , stopped = False
             , internalError = Nothing
             , randoms = randomStream
+            , vliwLoad = emptyVliwLoad
             }
 
 instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) w) (IoMem (Isa w w) w) (Isa w w) w where
@@ -463,6 +521,11 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
                     viewRegister f r''
             _ -> errorView v
 
+    summaryView _labels State{vliwLoad} v = case T.splitOn ":" v of
+        ["vliw", "load-percent"] -> Just (show (vliwLoadPercent vliwLoad) <> "%")
+        ["vliw", "bundles-by-load"] -> Just (renderBundlesByLoad vliwLoad)
+        _ -> Nothing
+
 instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w w) w where
     instructionFetch = do
         st <- get
@@ -476,7 +539,9 @@ instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w 
                         put st{mem = mem'}
                         return $ Right (pc, instruction)
 
-    instructionExecute _pc Isa{memOp, alu1Op, alu2Op, ctrlOp} = do
+    instructionExecute _pc bundle@Isa{memOp, alu1Op, alu2Op, ctrlOp} = do
+        -- Tally per-bundle slot usage for the vliw:* report variables.
+        modify $ \st -> st{vliwLoad = recordBundle bundle (vliwLoad st)}
         -- Phase 1: Read all source operands and compute results (without modifying state)
         memResult <- computeMem memOp
         alu1OpResult <- computeAlu alu1Op

@@ -179,6 +179,15 @@ class StateInterspector st m isa w | st -> m isa w where
     reprState :: HashMap String w -> st -> Text -> Text
     reprState _labels _st var = "unknown variable: " <> var
 
+    -- | Per-run summary views, resolved from the simulator's *final* state
+    --   (not the per-state record in the trace log). Use this for stats that
+    --   only make sense at end-of-run -- e.g. accumulators that grow each
+    --   step, where the per-state value would be off by one. Returns
+    --   'Nothing' when the variable isn't a summary view, in which case the
+    --   resolver falls through to the per-state 'reprState'.
+    summaryView :: HashMap String w -> st -> Text -> Maybe Text
+    summaryView _labels _st _var = Nothing
+
 class Machine st isa w | st -> isa w where
     instructionFetch :: State st (Either Text (Int, isa))
     instructionStep :: State st ()

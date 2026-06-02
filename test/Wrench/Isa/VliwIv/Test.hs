@@ -224,6 +224,7 @@ st0 =
         , stopped = False
         , internalError = Nothing
         , randoms = []
+        , vliwLoad = emptyVliwLoad
         }
 
 withRegs :: [(Register, Int32)] -> VliwIvState Int32
