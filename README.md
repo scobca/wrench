@@ -122,7 +122,19 @@ reports:
         mem:io-ranges:         {mem:io-ranges}
 ```
 
-Comparing `layout:*-size` against `mem:*-ranges` shows which declared bytes the program actually touched and which addresses it accessed outside any declared section (the stack region is the typical case). The full list of variables, including byte-count vs. range conventions, is in the [configuration documentation](./docs/README.md#view).
+Comparing `layout:*-size` against `mem:*-ranges` shows which declared bytes the program actually touched and which addresses it accessed outside any declared section (the stack region is the typical case).
+
+For the same picture in one shot, drop `{memory:table}` into a `view` -- it renders the whole address space as a single table (one row per declared section, IO cluster, or free span) with a `Coverage` column:
+
+```yaml
+reports:
+    - name: memory-map
+      slice: last
+      view: |
+        {memory:table}
+```
+
+The full list of variables, including the byte-count vs. range conventions and the `:dec`/`:hex` suffix on range variables, is in the [configuration documentation](./docs/README.md#view).
 
 ## Examples
 
