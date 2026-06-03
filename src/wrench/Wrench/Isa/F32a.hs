@@ -376,6 +376,13 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
     summaryView _labels State{dataStackMax, returnStackMax} v = case T.splitOn ":" v of
         ["f32a", "data-stack-max"] -> Just $ show dataStackMax
         ["f32a", "return-stack-max"] -> Just $ show returnStackMax
+        ["isa-specific"] ->
+            Just
+                $ "f32a:data-stack-max:   "
+                <> show dataStackMax
+                <> "\n"
+                <> "f32a:return-stack-max: "
+                <> show returnStackMax
         _ -> Nothing
 
 instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w w) w where

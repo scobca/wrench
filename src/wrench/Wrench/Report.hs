@@ -143,6 +143,10 @@ prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount 
             ["mem", "io-ranges"] -> renderIntervalsHex alIo
             ["mem", "io-ranges", fmt] -> rangesFmt fmt alIo
             ["memory", "table"] -> renderMemoryTable dumpStats (memoryDump finalState)
+            -- ISA-specific summary block: each architecture fills it with its
+            -- own stats (vliw:*, f32a:*, ...); ISAs without any render "".
+            -- Lets a single report template stay uniform across ISAs.
+            ["isa-specific"] -> fromMaybe "" (summaryView labels finalState "isa-specific")
             _ -> case summaryView labels finalState v of
                 Just txt -> txt
                 Nothing -> reprState labels st v

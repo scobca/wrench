@@ -301,6 +301,7 @@ Execution and memory statistics. These are typically used with `slice: last` to 
 - `mem:data-ranges` -- Address ranges of data reads and writes (merged into one set). Same `:dec`/`:hex` suffix.
 - `mem:io-ranges` -- Address ranges of memory-mapped IO accesses. Same `:dec`/`:hex` suffix.
 - `memory:table` -- Multi-line address-space table that puts the above together: one row per declared `text`/`data` section, one per IO cluster, and `x` rows for free regions (split at access boundaries, so the stack gets its own row). Columns: `Kind`, `Range`, `Bytes`, `Accessed`, `Coverage`. The `Bytes` column sums to `memory_size` as a built-in sanity check.
+- `isa-specific` -- ISA-specific summary block. Each architecture fills it with its own stat lines (e.g. `vliw:load-percent` + `vliw:bundles-by-load` on vliw-iv; `f32a:data-stack-max` + `f32a:return-stack-max` on f32a); architectures without any render an empty block. Lets one report template stay uniform across ISAs without emitting `[unknown-view]` for the variables that don't apply.
 
 Example -- print a stats summary after the simulation finishes:
 

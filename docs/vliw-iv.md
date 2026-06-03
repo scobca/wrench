@@ -275,3 +275,5 @@ vliw:bundles-by-load: 1:3 (9%), 3:16 (48%), 4:14 (42%)
 ```
 
 — 14 fully-packed bundles (`4:14 (42%)`), 16 three-wide (`3:16 (48%)`), 3 with a single active slot (`1:3 (9%)`), no idle or two-slot bundles.
+
+Both lines are also emitted together by the generic `{isa-specific}` summary block, which lets a single report template stay uniform across ISAs.
