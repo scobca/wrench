@@ -235,6 +235,10 @@ data MachineState mem w = State
     , ram :: mem
     , dataStack :: [w]
     , returnStack :: [w]
+    , dataStackMax :: !Int
+    -- ^ High-water mark of the data stack depth over the run (for f32a:data-stack-max).
+    , returnStackMax :: !Int
+    -- ^ High-water mark of the return stack depth over the run (for f32a:return-stack-max).
     , stopped :: Bool
     , extendedArithmeticMode :: Bool
     , carryFlag :: Bool
@@ -250,6 +254,8 @@ instance (MachineWord w) => InitState (IoMem (Isa w w) w) (MachineState (IoMem (
             , b = def
             , dataStack = []
             , returnStack = []
+            , dataStackMax = 0
+            , returnStackMax = 0
             , ram = dump
             , stopped = False
             , extendedArithmeticMode = False
@@ -290,8 +296,9 @@ setWord addr w = do
 
 dataPush w = do
     setCarryFlag False
-    st@State{dataStack} <- get
-    put st{dataStack = w : dataStack}
+    st@State{dataStack, dataStackMax} <- get
+    let dataStack' = w : dataStack
+    put st{dataStack = dataStack', dataStackMax = max dataStackMax (length dataStack')}
 
 dataPop :: (MachineWord w) => State (MachineState (IoMem (Isa w w) w) w) w
 dataPop = do
@@ -305,8 +312,9 @@ dataPop = do
             return x
 
 returnPush w = do
-    st@State{returnStack} <- get
-    put st{returnStack = w : returnStack}
+    st@State{returnStack, returnStackMax} <- get
+    let returnStack' = w : returnStack
+    put st{returnStack = returnStack', returnStackMax = max returnStackMax (length returnStack')}
 
 returnPop :: (MachineWord w) => State (MachineState (IoMem (Isa w w) w) w) w
 returnPop = do
@@ -364,6 +372,11 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
             stack "dec" dt = toText $ intercalate ":" $ map show dt
             stack "hex" dt = T.intercalate ":" $ map (toText . word32ToHex) dt
             stack f _ = unknownFormat f
+
+    summaryView _labels State{dataStackMax, returnStackMax} v = case T.splitOn ":" v of
+        ["f32a", "data-stack-max"] -> Just $ show dataStackMax
+        ["f32a", "return-stack-max"] -> Just $ show returnStackMax
+        _ -> Nothing
 
 instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w w) w where
     instructionFetch = do
