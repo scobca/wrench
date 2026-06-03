@@ -166,7 +166,7 @@ renderMemoryTable dumpStats mem =
         wordSize = byteSizeT @w
         AccessLog{alInstr, alData, alIo} = accessLog mem
         DumpStats{dsTextIntervals, dsDataIntervals} = dumpStats
-        ioIntervals = foldr (\k acc -> recordRange k wordSize acc) emptyIntervals ports
+        ioIntervals = foldr (`recordRange` wordSize) emptyIntervals ports
         accessedAll = alInstr `intervalsUnion` alData `intervalsUnion` alIo
 
         -- Declared section rows: one per text/data/io cluster (in-section
