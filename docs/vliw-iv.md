@@ -248,3 +248,30 @@ add rd, rs1, rs2 / addi rd, rs1, k / lw rd, offset(rs1) / beq rs1, rs2, k
 - `<reg>:dec`, `<reg>:hex` -- View the value of a specific register in decimal or hexadecimal format.
 
 Available registers: `Zero`, `Ra`, `Sp`, `Gp`, `Tp`, `T0`, `T1`, `T2`, `S0Fp`, `S1`, `A0`, `A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `A7`, `S2`, `S3`, `S4`, `S5`, `S6`, `S7`, `S8`, `S9`, `S10`, `S11`, `T3`, `T4`, `T5`, `T6`.
+
+### Slot utilization (parallelism)
+
+Each VLIW bundle has four execution slots (memory, ALU1, ALU2, control). A slot containing the corresponding `nop` is idle; everything else counts as active. The simulator tallies how many slots each executed bundle used and exposes two summary view variables. They're typically used with `slice: last` because the values are run-totals.
+
+- `vliw:load-percent` -- average slot utilization across the run, as an integer percent. `(active_slots * 100) / (bundles * 4)`. `25%` means each bundle used one slot on average; `100%` means every slot of every bundle was active.
+- `vliw:bundles-by-load` -- histogram rendered as comma-separated `K:N (P%)` entries, one per non-empty bucket. `K` is the active-slot count, `N` is the number of bundles in that bucket, `P` is its percent share of all executed bundles. Empty buckets are skipped. A peak at 1 means a serial program; a peak at 3-4 means the compiler / programmer is exploiting the pipeline.
+
+Example -- print a load summary at the end of the simulation:
+
+```yaml
+reports:
+    - name: vliw-load
+      slice: last
+      view: |
+        vliw:load-percent:    {vliw:load-percent}
+        vliw:bundles-by-load: {vliw:bundles-by-load}
+```
+
+For `hello.s` running on this ISA the summary reads:
+
+```text
+vliw:load-percent:    81%
+vliw:bundles-by-load: 1:3 (9%), 3:16 (48%), 4:14 (42%)
+```
+
+— 14 fully-packed bundles (`4:14 (42%)`), 16 three-wide (`3:16 (48%)`), 3 with a single active slot (`1:3 (9%)`), no idle or two-slot bundles.

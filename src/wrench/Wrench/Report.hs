@@ -143,7 +143,9 @@ prepareStateView line TranslatorResult{labels, dumpStats} finalState instrCount 
             ["mem", "io-ranges"] -> renderIntervalsHex alIo
             ["mem", "io-ranges", fmt] -> rangesFmt fmt alIo
             ["memory", "table"] -> renderMemoryTable dumpStats (memoryDump finalState)
-            _ -> reprState labels st v
+            _ -> case summaryView labels finalState v of
+                Just txt -> txt
+                Nothing -> reprState labels st v
         rangesFmt "dec" = renderIntervals
         rangesFmt "hex" = renderIntervalsHex
         rangesFmt fmt = const (unknownFormat fmt)
