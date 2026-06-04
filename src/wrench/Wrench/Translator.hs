@@ -84,7 +84,8 @@ translate memorySize fn src =
                 (Right labels) ->
                     let resolveLabel l = (labels !? l)
                         code = map (uncurry (derefSection resolveLabel)) (markupSectionOffsets 0 sections)
-                        dump = prepareDump memorySize code
                         stats = computeDumpStats code
-                     in Right $ TranslatorResult dump labels stats
+                     in do
+                            dump <- prepareDump memorySize code
+                            Right $ TranslatorResult dump labels stats
         Left err -> Left $ toText $ errorBundlePretty err

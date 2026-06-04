@@ -38,7 +38,7 @@ data DumpStats = DumpStats
     }
     deriving (Eq, Show)
 
-prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> Mem isa w
+prepareDump :: (ByteSize isa, MachineWord w) => Int -> [Section isa w w] -> Either Text (Mem isa w)
 prepareDump memorySize sections =
     let addSection cells offset dump =
             let dump' = zip [offset ..] cells
@@ -75,12 +75,18 @@ prepareDump memorySize sections =
         placeholder = map (,Value 0) [0 .. memorySize - 1]
      in if dumpSize > memorySize
             then
-                error $ "error: can not fit translation results in memory, need: " <> show dumpSize <> " available: " <> show memorySize
+                Left
+                    $ "program does not fit in memory: it needs "
+                    <> show dumpSize
+                    <> " bytes, but memory_size is "
+                    <> show memorySize
+                    <> " bytes. Increase memory_size in the configuration."
             else
-                Mem
-                    { memorySize
-                    , memoryData = fromList (placeholder <> fromSections)
-                    }
+                Right
+                    Mem
+                        { memorySize
+                        , memoryData = fromList (placeholder <> fromSections)
+                        }
 
 -- | Translation-time layout summary derived from the section list.
 computeDumpStats :: (ByteSize isa, ByteSizeT w) => [Section isa w l] -> DumpStats

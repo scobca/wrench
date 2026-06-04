@@ -142,6 +142,18 @@ submitForm conf@Config{cStoragePath, cVariantsPath} cookie task@SimulationReques
         let testCaseLogFn = dir <> "/test_cases_result.log"
         liftIO $ writeFileText testCaseLogFn srTestCase
 
+    -- Execution stats for every variant case (the `Execution statistics`
+    -- report block injected into each generated variant config). Headed by
+    -- the case's status line so the report page can show stats per case.
+    let statsLog =
+            T.intercalate "\n\n---\n\n"
+                $ map
+                    ( \(SimulationResult{srTestCaseStatus, srStats}) ->
+                        "# " <> T.takeWhile (/= '\n') srTestCaseStatus <> "\n" <> srStats
+                    )
+                    varChecks
+    liftIO $ writeFileText (dir <> "/stats.log") statsLog
+
     endAt <- liftIO now
     track <- liftIO $ getTrack cookie
     posthogId <- liftIO $ getPosthogIdFromCookie cookie (track <> "_mp")
@@ -195,6 +207,7 @@ getReport conf@Config{cStoragePath} cookie guid = do
             then decodeUtf8 <$> readFileBS (dir <> "/wrench-version.txt")
             else return "< 0.2.11"
     dump <- liftIO (fromMaybe "DUMP NOT AVAILABLE" <$> maybeReadFile (dumpFn cStoragePath guid))
+    stats <- liftIO (fromMaybe "" <$> maybeReadFile (dir <> "/stats.log"))
 
     template <- liftIO (decodeUtf8 <$> readFileBS "static/result.html")
 
@@ -219,6 +232,7 @@ getReport conf@Config{cStoragePath} cookie guid = do
                 , ("{{yaml_content}}", formatCodeWithLineNumbers configContent)
                 , ("{{result}}", formatCodeWithLineNumbers logContent)
                 , ("{{test_cases_result}}", formatCodeWithLineNumbers testCaseResult)
+                , ("{{execution_stats}}", formatCodeWithLineNumbers stats)
                 , ("{{dump}}", formatCodeWithLineNumbers dump)
                 ]
 

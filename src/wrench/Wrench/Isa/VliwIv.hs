@@ -524,6 +524,13 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
     summaryView _labels State{vliwLoad} v = case T.splitOn ":" v of
         ["vliw", "load-percent"] -> Just (show (vliwLoadPercent vliwLoad) <> "%")
         ["vliw", "bundles-by-load"] -> Just (renderBundlesByLoad vliwLoad)
+        ["isa-specific"] ->
+            Just
+                $ "vliw:load-percent:     "
+                <> show (vliwLoadPercent vliwLoad)
+                <> "%\n"
+                <> "vliw:bundles-by-load: "
+                <> renderBundlesByLoad vliwLoad
         _ -> Nothing
 
 instance (MachineWord w) => Machine (MachineState (IoMem (Isa w w) w) w) (Isa w w) w where
