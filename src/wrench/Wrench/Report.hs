@@ -191,10 +191,7 @@ renderMemoryTable dumpStats mem =
         hexW = max 3 (length (showHex (max 0 (memSize - 1)) ""))
         addrStr a =
             let h = showHex a ""
-             in "0x" <> T.pack (replicate (hexW - length h) '0') <> T.pack (map toUpperHex h)
-        toUpperHex c
-            | c >= 'a' && c <= 'f' = toEnum (fromEnum c - 32)
-            | otherwise = c
+             in "0x" <> T.pack (replicate (hexW - length h) '0') <> T.pack h
 
         formatRange lo hi = addrStr lo <> ".." <> addrStr hi
 
