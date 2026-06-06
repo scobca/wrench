@@ -251,9 +251,10 @@ Available registers: `Zero`, `Ra`, `Sp`, `Gp`, `Tp`, `T0`, `T1`, `T2`, `S0Fp`, `
 
 ### Slot utilization (parallelism)
 
-Each VLIW bundle has four execution slots (memory, ALU1, ALU2, control). A slot containing the corresponding `nop` is idle; everything else counts as active. The simulator tallies how many slots each executed bundle used and exposes two summary view variables. They're typically used with `slice: last` because the values are run-totals.
+Each VLIW bundle has four execution slots (memory, ALU1, ALU2, control). A slot containing the corresponding `nop` is idle; everything else counts as active. The simulator tallies how many slots each executed bundle used and exposes three summary view variables. They're typically used with `slice: last` because the values are run-totals.
 
 - `vliw:load-percent` -- average slot utilization across the run, as an integer percent. `(active_slots * 100) / (bundles * 4)`. `25%` means each bundle used one slot on average; `100%` means every slot of every bundle was active.
+- `vliw:avg-load` -- average number of active processing units (slots) per executed bundle, rendered with two decimals. `active_slots / bundles`, a value in `0.00`–`4.00`. This is the same measure as `vliw:load-percent` expressed as units-per-bundle instead of a percent of the four-wide width.
 - `vliw:bundles-by-load` -- histogram rendered as comma-separated `K:N (P%)` entries, one per non-empty bucket. `K` is the active-slot count, `N` is the number of bundles in that bucket, `P` is its percent share of all executed bundles. Empty buckets are skipped. A peak at 1 means a serial program; a peak at 3-4 means the compiler / programmer is exploiting the pipeline.
 
 Example -- print a load summary at the end of the simulation:
@@ -264,6 +265,7 @@ reports:
       slice: last
       view: |
         vliw:load-percent:    {vliw:load-percent}
+        vliw:avg-load:        {vliw:avg-load}
         vliw:bundles-by-load: {vliw:bundles-by-load}
 ```
 
@@ -271,9 +273,10 @@ For `hello.s` running on this ISA the summary reads:
 
 ```text
 vliw:load-percent:    81%
+vliw:avg-load:        3.24
 vliw:bundles-by-load: 1:3 (9%), 3:16 (48%), 4:14 (42%)
 ```
 
-— 14 fully-packed bundles (`4:14 (42%)`), 16 three-wide (`3:16 (48%)`), 3 with a single active slot (`1:3 (9%)`), no idle or two-slot bundles.
+— 14 fully-packed bundles (`4:14 (42%)`), 16 three-wide (`3:16 (48%)`), 3 with a single active slot (`1:3 (9%)`), no idle or two-slot bundles, for an average of `3.24` active units per bundle.
 
-Both lines are also emitted together by the generic `{isa-specific}` summary block, which lets a single report template stay uniform across ISAs.
+All three lines are also emitted together by the generic `{isa-specific}` summary block, which lets a single report template stay uniform across ISAs.
