@@ -542,13 +542,13 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
         ["vliw", "bundles-by-load"] -> Just (renderBundlesByLoad vliwLoad)
         ["isa-specific"] ->
             Just
-                $ "vliw:load-percent:      "
+                $ "vliw:load-percent:    "
                 <> show (vliwLoadPercent vliwLoad)
                 <> "%\n"
-                <> "vliw:avg-load:         "
+                <> "vliw:avg-load:        "
                 <> vliwAvgLoad vliwLoad
                 <> "\n"
-                <> "vliw:bundles-by-load:  "
+                <> "vliw:bundles-by-load: "
                 <> renderBundlesByLoad vliwLoad
         _ -> Nothing
 
