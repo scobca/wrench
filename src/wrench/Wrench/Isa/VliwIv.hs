@@ -213,6 +213,21 @@ vliwLoadPercent (VliwLoadAcc m) =
         active = sum [k * n | (k, n) <- toPairs m]
      in if total == 0 then 0 else (active * 100) `div` (total * 4)
 
+-- | Average number of active slots (processing units) used per executed
+--   bundle, rendered with two decimal places. An empty histogram renders as
+--   @"0.00"@.
+vliwAvgLoad :: VliwLoadAcc -> Text
+vliwAvgLoad (VliwLoadAcc m) =
+    let total = sum m
+        active = sum [k * n | (k, n) <- toPairs m]
+     in if total == 0
+            then "0.00"
+            else
+                let scaled = (active * 100) `div` total
+                    whole = scaled `div` 100
+                    frac = scaled `mod` 100
+                 in show whole <> "." <> (if frac < 10 then "0" else "") <> show frac
+
 -- | Render the per-load histogram as @"K:N (P%)"@ pairs separated by commas,
 --   one per non-empty bucket. @K@ is the active-slot count, @N@ is the
 --   number of bundles in that bucket, @P@ is its percent share of executed
@@ -523,13 +538,17 @@ instance (MachineWord w) => StateInterspector (MachineState (IoMem (Isa w w) w) 
 
     summaryView _labels State{vliwLoad} v = case T.splitOn ":" v of
         ["vliw", "load-percent"] -> Just (show (vliwLoadPercent vliwLoad) <> "%")
+        ["vliw", "avg-load"] -> Just (vliwAvgLoad vliwLoad)
         ["vliw", "bundles-by-load"] -> Just (renderBundlesByLoad vliwLoad)
         ["isa-specific"] ->
             Just
-                $ "vliw:load-percent:     "
+                $ "vliw:load-percent:      "
                 <> show (vliwLoadPercent vliwLoad)
                 <> "%\n"
-                <> "vliw:bundles-by-load: "
+                <> "vliw:avg-load:         "
+                <> vliwAvgLoad vliwLoad
+                <> "\n"
+                <> "vliw:bundles-by-load:  "
                 <> renderBundlesByLoad vliwLoad
         _ -> Nothing
 
