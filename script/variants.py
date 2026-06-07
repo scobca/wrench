@@ -208,11 +208,11 @@ def inf_shuffle(xs):
 
 
 def fun_shuffle(xs):
-    a, b, c, d, e = xs
+    a, b, c, d, e, vliw = xs
     xs = [a, b, d]
     random.shuffle(xs)
     a, b, d = xs
-    return a, b, c, d, e
+    return a, b, c, d, e, vliw
 
 
 def gen_variants(cases):
@@ -223,6 +223,7 @@ def gen_variants(cases):
         inf_shuffle(categories["Complex Tasks"]),
         inf_shuffle(categories["Mathematics"]),
         inf_shuffle(["acc32", "f18a", "m68k", "risc-iv"]),
+        inf_shuffle(categories["VLIW"]),
     ):
         yield fun_shuffle(e)
 
@@ -230,16 +231,16 @@ def gen_variants(cases):
 def generate_variants(n, fn):
     variants = [next(gen_variants(TEST_CASES)) for _ in range(n)]
     distribution = {}
-    for a, b, c, d, e in variants:
-        distribution[(a, b, c, d, e)] = distribution.get((a, b, c, d, e), 0) + 1
+    for row in variants:
+        distribution[row] = distribution.get(row, 0) + 1
     grouped_by_rep = {}
     for k, v in distribution.items():
         grouped_by_rep[v] = grouped_by_rep.get(v, 0) + 1
     print("Generate random variants to csv file:", grouped_by_rep)
     with open(fn, "w") as f:
-        f.write("acc32,f32a,m68k,risc-iv,scheme\n")
-        for a, b, c, d, e in variants:
-            f.write(f"{a},{b},{c},{d},{e}\n")
+        f.write("acc32,f32a,m68k,risc-iv,scheme,vliw\n")
+        for row in variants:
+            f.write(",".join(row) + "\n")
 
 
 if __name__ == "__main__":
