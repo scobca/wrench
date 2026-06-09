@@ -71,6 +71,7 @@ translate ::
     , DerefMnemonic (isa_ w) w
     , MachineWord w
     , MnemonicParser (isa_ w (Ref w))
+    , Show (isa_ w w)
     ) =>
     Int
     -> FilePath

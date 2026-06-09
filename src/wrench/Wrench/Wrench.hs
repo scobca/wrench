@@ -148,6 +148,7 @@ wrench ::
     , Machine st isa2 w
     , MachineWord w
     , MnemonicParser isa1
+    , Show (isa_ w w)
     , StateInterspector st (IoMem isa2 w) isa2 w
     , isa1 ~ isa_ w (Ref w)
     , isa2 ~ isa_ w w
