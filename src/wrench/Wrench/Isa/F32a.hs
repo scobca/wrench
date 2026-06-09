@@ -18,6 +18,7 @@ import Text.Megaparsec (anySingleBut, choice, try)
 import Text.Megaparsec.Char (char, hspace, hspace1, string)
 import Wrench.Machine.Memory
 import Wrench.Machine.Types
+import Wrench.Machine.Word
 import Wrench.Report
 import Wrench.Translator.Parser.Misc
 import Wrench.Translator.Parser.Types

@@ -6,6 +6,7 @@ import Relude
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Wrench.Machine.Types
+import Wrench.Machine.Word
 
 tests :: TestTree
 tests =

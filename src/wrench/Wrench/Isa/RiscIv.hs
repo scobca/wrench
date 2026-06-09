@@ -29,9 +29,8 @@ import Wrench.Machine.Types (
     StateInterspector (..),
     fromSign,
     halted,
-    lShiftR,
-    signBitAnd,
  )
+import Wrench.Machine.Word (lShiftR, signBitAnd)
 import Wrench.Report
 import Wrench.Translator.Parser.Misc (eol', hexNum, num, reference, referenceWithDirective)
 import Wrench.Translator.Parser.Types

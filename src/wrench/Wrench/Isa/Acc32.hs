@@ -15,6 +15,7 @@ import Text.Megaparsec (choice, try)
 import Text.Megaparsec.Char (hspace, hspace1, string)
 import Wrench.Machine.Memory
 import Wrench.Machine.Types
+import Wrench.Machine.Word
 import Wrench.Report
 import Wrench.Translator.Parser.Misc
 import Wrench.Translator.Parser.Types
