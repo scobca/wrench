@@ -27,14 +27,7 @@ module Wrench.Machine.Types (
     ByteSize (..),
     ByteSizeT (..),
     WordParts (..),
-    signBitAnd,
-    Ext (..),
-    addExt,
-    subExt,
-    mulExt,
     halted,
-    lShiftL,
-    lShiftR,
 ) where
 
 import Data.Bits
@@ -115,41 +108,6 @@ instance WordParts Int8 where
     wordCombine [b] = fromInteger $ toInteger b
     wordCombine _ = error "not applicable"
     byteToWord = fromIntegral
-
-signBitAnd :: (MachineWord w) => w -> w -> w
-signBitAnd x mask
-    | x < 0 = x .|. complement mask
-    | otherwise = x .&. mask
-
-lShiftR :: (MachineWord w) => w -> w -> w
-lShiftR x n = toSign (fromSign x `shiftR` fromEnum n)
-
-lShiftL :: (MachineWord w) => w -> w -> w
-lShiftL x n = toSign (fromSign x `shiftL` fromEnum n)
-
-data Ext a = Ext {value :: a, overflow :: Bool, carry :: Bool}
-    deriving (Eq, Show)
-
-addExt :: (MachineWord w) => w -> w -> Ext w
-addExt x y =
-    let result = x + y
-        overflow = ((x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0))
-        carry = testBit (toInteger (fromSign x) + toInteger (fromSign y)) (finiteBitSize x)
-     in Ext{value = result, overflow, carry}
-
-subExt :: (MachineWord w) => w -> w -> Ext w
-subExt x y =
-    let result = x - y
-        overflow = ((x > 0 && y < 0 && result < 0) || (x < 0 && y > 0 && result > 0))
-        carry = fromSign x < fromSign y
-     in Ext{value = result, overflow, carry}
-
-mulExt :: (MachineWord w) => w -> w -> Ext w
-mulExt x y =
-    let result = x * y
-        overflow = (x /= 0 && y /= 0 && result `div` x /= y)
-        carry = (fromIntegral x * fromIntegral y) > (maxBound :: Word)
-     in Ext{value = result, overflow, carry}
 
 class ByteSize t where
     byteSize :: t -> Int

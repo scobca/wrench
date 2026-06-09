@@ -13,7 +13,7 @@ module Wrench.Isa.VliwIv (
     emptyVliwLoad,
 ) where
 
-import Data.Bits (bit, complement, shiftL, shiftR, testBit, (.&.), (.|.))
+import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import Data.Default
 import Data.Text qualified as T
 import Relude
@@ -30,8 +30,8 @@ import Wrench.Machine.Types (
     StateInterspector (..),
     fromSign,
     halted,
-    lShiftR,
  )
+import Wrench.Machine.Word (fitSigned, lShiftR)
 import Wrench.Report
 import Wrench.Translator.Parser.Misc (eol', hexNum, num, reference, referenceWithDirective)
 import Wrench.Translator.Parser.Types
@@ -411,16 +411,6 @@ instance (MachineWord w) => DerefMnemonic (Isa w) w where
 
 instance ByteSize (Isa w l) where
     byteSize _ = 14
-
--- | Sign-extend the low @n@ bits of a value to the full machine word, modelling
--- a fixed-width signed instruction field. Bits at or above bit @n@ are silently
--- discarded (truncation), matching the documented per-slot field widths: any
--- constant that does not fit its field is reduced to its low @n@ bits.
-fitSigned :: (MachineWord w) => Int -> w -> w
-fitSigned n x =
-    let mask = bit n - 1
-        low = x .&. mask
-     in if testBit low (n - 1) then low .|. complement mask else low
 
 comma = hspace >> string "," >> hspace
 
