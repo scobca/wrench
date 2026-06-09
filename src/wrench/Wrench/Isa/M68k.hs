@@ -22,8 +22,8 @@ import Data.Text qualified as T
 import Relude
 import Relude.Extra
 import Relude.Unsafe qualified as Unsafe
-import Text.Megaparsec (choice, oneOf, try)
-import Text.Megaparsec.Char (hspace, hspace1, string)
+import Text.Megaparsec (choice, notFollowedBy, oneOf, try)
+import Text.Megaparsec.Char (alphaNumChar, char, hspace, hspace1, string)
 import Wrench.Machine.Memory
 import Wrench.Machine.Types
 import Wrench.Report
@@ -119,7 +119,7 @@ instance (MachineWord w) => MnemonicParser (Isa w (Ref w)) where
     mnemonic =
         choice
             [ cmd2args "move" Move (longMode <|> byteMode) src dst
-            , cmd2args "movea" MoveA longMode src addrRegister
+            , cmd2args "movea" MoveA longMode srcMovea addrRegister
             , cmd1args "not" Not (longMode <|> byteMode) dst
             , cmd1args "neg" Neg (longMode <|> byteMode) dst
             , cmd1args "clr" Clr (longMode <|> byteMode) dst
@@ -167,7 +167,15 @@ instance (MachineWord w) => MnemonicParser (Isa w (Ref w)) where
             , cmd0args "halt" Halt
             ]
         where
+            -- Generic source for instructions where Address Register Direct
+            -- is *not* a valid mode (move, add, sub, cmp, mul, div, logical
+            -- ops, shifts). @immidiate@ refuses register-shaped tokens, so
+            -- @move.l A2, D0@ produces a clean parse error instead of
+            -- silently consuming @A2@ as a label (issue #143).
             src = dataRegister <|> allIndirectAddr <|> immidiate
+            -- @movea@ is the one instruction that legitimately takes An as
+            -- source (e.g. @movea.l A2, A0@), so it gets a wider source.
+            srcMovea = dataRegister <|> addrRegister <|> allIndirectAddr <|> immidiate
             dst = dataRegister <|> allIndirectAddr
 
 cmd0args :: String -> Isa w (Ref w) -> Parser (Isa w (Ref w))
@@ -270,8 +278,19 @@ indirectAddrRegPostIncrement = try $ do
 
 allIndirectAddr = indirectAddrRegPreDecrement <|> indirectAddrRegPostIncrement <|> indirectAddrRegister
 
+-- | A bare register name (e.g. @A2@, @D3@) at the start of the input.
+--   Used as a negative guard so @immidiate@ refuses to consume register
+--   names as labels.
+registerLikeName :: Parser ()
+registerLikeName = try $ do
+    void (oneOf ['A', 'D'])
+    void (oneOf ['0' .. '7'])
+    notFollowedBy (alphaNumChar <|> char '_')
+
 immidiate :: (MachineWord w) => Parser (Argument w (Ref w))
-immidiate = Immediate <$> reference
+immidiate = do
+    notFollowedBy registerLikeName
+    Immediate <$> reference
 
 instance DerefMnemonic (Isa w) w where
     derefMnemonic f _offset i =
