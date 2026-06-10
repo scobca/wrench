@@ -18,7 +18,7 @@ import Numeric (showHex)
 import Relude
 import Servant
 import Servant.HTML.Lucid (HTML)
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, listDirectory)
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (takeBaseName, takeFileName, (</>))
 import Wrench.Misc (wrenchVersion)
@@ -45,7 +45,6 @@ main = do
     hSetBuffering stdout NoBuffering
     conf@Config{cPort} <- initConfig
     print $ mask conf
-    syncExamples conf
     putStrLn $ "Starting server on port " <> show cPort
     run cPort (logStdoutDev $ app conf)
 
@@ -181,8 +180,14 @@ type GetReport =
         :> Get '[HTML] (Headers '[Header "Set-Cookie" Text] (Html ()))
 
 getReport :: Config -> Maybe Text -> UUID -> Handler (Headers '[Header "Set-Cookie" Text] (Html ()))
-getReport conf@Config{cStoragePath} cookie guid = do
-    let dir = cStoragePath <> "/" <> show guid
+getReport conf@Config{cStoragePath, cExamplesPath} cookie guid = do
+    dir <- liftIO $ do
+        let storageDir = cStoragePath <> "/" <> show guid
+        let examplesDir = cExamplesPath <> "/" <> show guid
+        storageExists <- doesDirectoryExist storageDir
+        if storageExists
+            then return storageDir
+            else return examplesDir
 
     nameContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/name.txt"))
     variantContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/variant.txt"))
@@ -198,7 +203,7 @@ getReport conf@Config{cStoragePath} cookie guid = do
         if exist
             then decodeUtf8 <$> readFileBS (dir <> "/wrench-version.txt")
             else return "< 0.2.11"
-    dump <- liftIO (fromMaybe "DUMP NOT AVAILABLE" <$> maybeReadFile (dumpFn cStoragePath guid))
+    dump <- liftIO (fromMaybe "DUMP NOT AVAILABLE" <$> maybeReadFile (dir <> "/dump.txt"))
 
     template <- liftIO (decodeUtf8 <$> readFileBS "static/result.html")
 
@@ -350,36 +355,6 @@ renderItem ExampleEntry{eeGuid, eeTitle, eeDescription, eeOk} =
             <> "]</a>"
             <> descHtml
             <> "</li>"
-
-syncExamples :: Config -> IO ()
-syncExamples Config{cExamplesPath, cStoragePath} = do
-    exists <- doesDirectoryExist cExamplesPath
-    if not exists
-        then putStrLn $ "No bundled examples found at " <> cExamplesPath <> ", skipping sync."
-        else do
-            createDirectoryIfMissing True cStoragePath
-            entries <- listDirectory cExamplesPath
-            reportDirs <- filterM (doesDirectoryExist . (cExamplesPath </>)) entries
-            putStrLn
-                $ "Syncing "
-                <> show (length reportDirs)
-                <> " example report(s) from "
-                <> cExamplesPath
-                <> " to "
-                <> cStoragePath
-            forM_ reportDirs $ \name -> copyDirRecursive (cExamplesPath </> name) (cStoragePath </> name)
-
-copyDirRecursive :: FilePath -> FilePath -> IO ()
-copyDirRecursive src dst = do
-    createDirectoryIfMissing True dst
-    entries <- listDirectory src
-    forM_ entries $ \entry -> do
-        let from = src </> entry
-            to = dst </> entry
-        isDir <- doesDirectoryExist from
-        if isDir
-            then copyDirRecursive from to
-            else readFileBS from >>= writeFileBS to
 
 redirectToForm :: Handler (Headers '[Header "Location" Text] NoContent)
 redirectToForm = throwError $ err301{errHeaders = [("Location", "/submit-form")]}
