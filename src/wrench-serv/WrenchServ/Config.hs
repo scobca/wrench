@@ -24,7 +24,7 @@ initConfig = do
     (cWrenchPath : cWrenchArgs) <- maybe ["stack", "exec", "wrench", "--"] (splitOn " ") <$> lookupEnv "WRENCH_EXEC"
     cStoragePath <- fromMaybe "uploads" <$> lookupEnv "STORAGE_PATH"
     cVariantsPath <- fromMaybe "variants" <$> lookupEnv "VARIANTS"
-    cExamplesPath <- fromMaybe "examples_storage" <$> lookupEnv "EXAMPLES_PATH"
+    cExamplesPath <- fromMaybe "examples" <$> lookupEnv "EXAMPLES_PATH"
     cLogLimit <- maybe 10000 Unsafe.read <$> lookupEnv "LOG_LIMIT"
     cVariants <- listVariants cVariantsPath
 

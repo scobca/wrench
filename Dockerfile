@@ -72,13 +72,13 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 ENV VARIANTS=/app/variants
-ENV EXAMPLES_PATH=/app/examples_storage
+ENV EXAMPLES_PATH=/app/examples
 ENV WRENCH_EXEC=wrench
 
 WORKDIR /app
 COPY --from=wrench-build /app/.local/bin/wrench /app/.local/bin/wrench-serv /app/.local/bin/wrench-fmt /bin/
 COPY --from=wrench-variants /app/variants /app/variants
-COPY --from=wrench-examples /app/out/storage /app/examples_storage
+COPY --from=wrench-examples /app/out/storage /app/examples
 COPY static /app/static
 
 EXPOSE 8080
