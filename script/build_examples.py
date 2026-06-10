@@ -76,7 +76,7 @@ def discover_examples(example_root: Path) -> list[Example]:
             matched = [
                 y
                 for y, task in yaml_task.items()
-                if s_stem == task or s_stem.startswith(task + "-")
+                if s_stem == task
             ]
             for y in sorted(matched):
                 examples.append(Example(isa_dir, s, y, example_root))
@@ -226,7 +226,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str]) -> None:
     args = parse_args(argv)
 
     storage_dir: Path = args.output / "storage"
@@ -234,8 +234,7 @@ def main(argv: list[str]) -> int:
 
     examples = discover_examples(args.example_root)
     if not examples:
-        print(f"No examples discovered under {args.example_root}", file=sys.stderr)
-        return 1
+        raise RuntimeError(f"No examples discovered under {args.example_root}")
 
     version = wrench_version(args.wrench)
     print(f"Using wrench: {args.wrench} ({version})")
@@ -280,13 +279,10 @@ def main(argv: list[str]) -> int:
         )
 
     if failed and args.fail_fast:
-        print(f"{len(failed)} example(s) failed.", file=sys.stderr)
-        return 2
+        raise RuntimeError(f"{len(failed)} example(s) failed.")
     if unpaired and args.fail_fast:
-        print(f"{len(unpaired)} unpaired example file(s).", file=sys.stderr)
-        return 3
-    return 0
+        raise RuntimeError(f"{len(unpaired)} unpaired example file(s).")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    main(sys.argv[1:])
