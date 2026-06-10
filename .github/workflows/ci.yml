@@ -68,6 +68,9 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Build examples
+        run: python script/build_examples.py --fail-fast
+
       - uses: gacts/install-hurl@v1
 
       - name: Test server
