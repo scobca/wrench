@@ -65,6 +65,11 @@
           'test-cases-result-empty-tag',
         )
         handleEmptyContent(
+          'execution-stats-text-element',
+          'accordion-collapse-execution-stats',
+          'execution-stats-empty-tag',
+        )
+        handleEmptyContent(
           'simulation-log-text-element',
           'accordion-collapse-simulation-log',
           'simulation-log-empty-tag',
@@ -355,6 +360,42 @@
           class="hidden bg-[var(--c-dark-grey)] mb-4 p-4 rounded-lg"
         >
           failed_test_case = ""
+          <span class="text-[var(--c-grey)]"> /* nothing returned */</span>
+        </div>
+        <div
+          id="accordion-collapse-execution-stats"
+          data-accordion="collapse"
+          class="bg-[var(--c-dark-grey)] mb-4 p-4 rounded-lg"
+          data-inactive-classes="vim-folded text-[var(--c-orange-low-saturation)]"
+          data-active-classes="text-[var(--c-orange-low-saturation)] bg-transparent"
+        >
+          <h2
+            id="accordion-collapse-heading-execution-stats"
+            class="flex justify-between items-center hover:bg-[var(--c-white)] hover:opacity-80 w-full text-[var(--c-orange-low-saturation)] hover:text-[var(--c-black)] text-left hover:cursor-pointer vim-folded"
+            data-accordion-target="#accordion-collapse-body-execution-stats"
+            aria-expanded="false"
+            aria-controls="accordion-collapse-body-execution-stats"
+          >
+            <span class="flex-1 select-none">execution_stats =</span>
+          </h2>
+          <div
+            id="accordion-collapse-body-execution-stats"
+            class="hidden"
+            aria-labelledby="accordion-collapse-heading-execution-stats"
+          >
+            <div
+              id="execution-stats-text-element"
+              class="pb-4 rounded-lg overflow-x-auto"
+            >
+              {{execution_stats}}
+            </div>
+          </div>
+        </div>
+        <div
+          id="execution-stats-empty-tag"
+          class="hidden bg-[var(--c-dark-grey)] mb-4 p-4 rounded-lg"
+        >
+          execution_stats = ""
           <span class="text-[var(--c-grey)]"> /* nothing returned */</span>
         </div>
         <div
