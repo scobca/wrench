@@ -7,9 +7,9 @@ import Crypto.Hash.SHA1 qualified as SHA1
 import Data.Aeson (FromJSON (..), defaultOptions, eitherDecodeStrict, genericParseJSON)
 import Data.Aeson.Types (Options (..))
 import Data.ByteString qualified as B
+import Data.Char (toLower)
 import Data.Text (isSuffixOf, replace)
 import Data.Text qualified as T
-import Data.Char (toLower)
 import Data.Time (getCurrentTime, nominalDiffTimeToSeconds)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.UUID (UUID)
@@ -283,6 +283,7 @@ instance FromJSON ExampleEntry where
             defaultOptions
                 { fieldLabelModifier = map toLower . drop 2
                 }
+                
 getExamples :: Config -> Handler (Html ())
 getExamples Config{cExamplesPath} = do
     template <- liftIO (decodeUtf8 <$> readFileBS "static/examples.html")
