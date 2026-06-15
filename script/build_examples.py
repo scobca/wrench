@@ -116,17 +116,14 @@ def wrench_cmd(wrench: str) -> list[str]:
 
 
 def wrench_version(wrench: str) -> str:
-    try:
-        proc = subprocess.run(
-            wrench_cmd(wrench) + ["--version"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if proc.returncode == 0:
-            return proc.stdout.strip()
-    except FileNotFoundError:
-        pass
+    proc = subprocess.run(
+        wrench_cmd(wrench) + ["--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode == 0:
+        return proc.stdout.strip()
     return "unknown"
 
 
