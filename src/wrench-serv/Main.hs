@@ -1,9 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Main (main) where
 
 import Crypto.Hash.SHA1 qualified as SHA1
-import Data.Aeson (FromJSON (..), eitherDecodeStrict, withObject, (.!=), (.:), (.:?))
+import Data.Aeson (FromJSON (..), defaultOptions, eitherDecodeStrict, genericParseJSON)
+import Data.Aeson.Types (Options (..))
+import Data.Char (toLower)
 import Data.ByteString qualified as B
 import Data.Text (isSuffixOf, replace)
 import Data.Text qualified as T
@@ -197,9 +200,7 @@ getReport conf@Config{cStoragePath, cExamplesPath} cookie guid = do
         let storageDir = cStoragePath <> "/" <> show guid
         let examplesDir = cExamplesPath <> "/" <> show guid
         storageExists <- doesDirectoryExist storageDir
-        if storageExists
-            then return storageDir
-            else return examplesDir
+        return $ if storageExists then storageDir else examplesDir
 
     nameContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/name.txt"))
     variantContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/variant.txt"))
@@ -274,22 +275,11 @@ data ExampleEntry = ExampleEntry
     , eeDescription :: Text
     , eeOk :: Bool
     }
+    deriving (Generic)
 
 instance FromJSON ExampleEntry where
-    parseJSON = withObject "ExampleEntry" $ \o -> do
-        guid <- o .: "guid"
-        isa <- o .: "isa"
-        title <- o .: "title"
-        description <- o .:? "description" .!= ""
-        ok <- o .: "ok"
-        pure
-            ExampleEntry
-                { eeGuid = guid
-                , eeIsa = isa
-                , eeTitle = title
-                , eeDescription = description
-                , eeOk = ok
-                }
+    parseJSON = genericParseJSON defaultOptions
+        { fieldLabelModifier = map toLower . drop 2 }
 
 getExamples :: Config -> Handler (Html ())
 getExamples Config{cExamplesPath} = do
