@@ -283,7 +283,7 @@ instance FromJSON ExampleEntry where
             defaultOptions
                 { fieldLabelModifier = map toLower . drop 2
                 }
-                
+
 getExamples :: Config -> Handler (Html ())
 getExamples Config{cExamplesPath} = do
     template <- liftIO (decodeUtf8 <$> readFileBS "static/examples.html")
