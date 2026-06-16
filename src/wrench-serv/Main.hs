@@ -1,9 +1,13 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Main (main) where
 
 import Crypto.Hash.SHA1 qualified as SHA1
+import Data.Aeson (FromJSON (..), defaultOptions, eitherDecodeStrict, genericParseJSON)
+import Data.Aeson.Types (Options (..))
 import Data.ByteString qualified as B
+import Data.Char (toLower)
 import Data.Text (isSuffixOf, replace)
 import Data.Text qualified as T
 import Data.Time (getCurrentTime, nominalDiffTimeToSeconds)
@@ -17,7 +21,7 @@ import Numeric (showHex)
 import Relude
 import Servant
 import Servant.HTML.Lucid (HTML)
-import System.Directory (doesFileExist, listDirectory)
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (takeBaseName, takeFileName, (</>))
 import Wrench.Misc (wrenchVersion)
@@ -54,6 +58,7 @@ type API =
     "submit-form" :> GetForm
         :<|> "submit" :> SubmitForm
         :<|> "report" :> GetReport
+        :<|> "examples" :> GetExamples
         :<|> "assets" :> Raw
         :<|> Get '[JSON] (Headers '[Header "Location" Text] NoContent)
 
@@ -62,6 +67,7 @@ server conf =
     getForm conf
         :<|> submitForm conf
         :<|> getReport conf
+        :<|> getExamples conf
         :<|> serveDirectoryWebApp "static/assets"
         :<|> redirectToForm
 
@@ -189,8 +195,12 @@ type GetReport =
         :> Get '[HTML] (Headers '[Header "Set-Cookie" Text] (Html ()))
 
 getReport :: Config -> Maybe Text -> UUID -> Handler (Headers '[Header "Set-Cookie" Text] (Html ()))
-getReport conf@Config{cStoragePath} cookie guid = do
-    let dir = cStoragePath <> "/" <> show guid
+getReport conf@Config{cStoragePath, cExamplesPath} cookie guid = do
+    dir <- liftIO $ do
+        let storageDir = cStoragePath <> "/" <> show guid
+        let examplesDir = cExamplesPath <> "/" <> show guid
+        storageExists <- doesDirectoryExist storageDir
+        return $ if storageExists then storageDir else examplesDir
 
     nameContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/name.txt"))
     variantContent <- liftIO (decodeUtf8 <$> readFileBS (dir <> "/variant.txt"))
@@ -206,7 +216,7 @@ getReport conf@Config{cStoragePath} cookie guid = do
         if exist
             then decodeUtf8 <$> readFileBS (dir <> "/wrench-version.txt")
             else return "< 0.2.11"
-    dump <- liftIO (fromMaybe "DUMP NOT AVAILABLE" <$> maybeReadFile (dumpFn cStoragePath guid))
+    dump <- liftIO (fromMaybe "DUMP NOT AVAILABLE" <$> maybeReadFile (dir <> "/dump.txt"))
     stats <- liftIO (fromMaybe "" <$> maybeReadFile (dir <> "/stats.log"))
 
     template <- liftIO (decodeUtf8 <$> readFileBS "static/result.html")
@@ -255,6 +265,103 @@ versionWarning reportVer
     | reportVer == wrenchVersion = ""
     | otherwise =
         " <span class=\"text-[var(--c-orange)]\">[WARNING: current wrench version is " <> escapeHtml wrenchVersion <> "]</span>"
+
+type GetExamples = Get '[HTML] (Html ())
+
+data ExampleEntry = ExampleEntry
+    { eeGuid :: Text
+    , eeIsa :: Text
+    , eeTitle :: Text
+    , eeDescription :: Text
+    , eeOk :: Bool
+    }
+    deriving (Generic)
+
+instance FromJSON ExampleEntry where
+    parseJSON =
+        genericParseJSON
+            defaultOptions
+                { fieldLabelModifier = map toLower . drop 2
+                }
+
+getExamples :: Config -> Handler (Html ())
+getExamples Config{cExamplesPath} = do
+    template <- liftIO (decodeUtf8 <$> readFileBS "static/examples.html")
+    entries <- liftIO $ readExamplesIndex cExamplesPath
+    let rendered =
+            foldl'
+                (\st (pat, new) -> replace pat new st)
+                template
+                [ ("{{examples}}", renderExamplesList entries)
+                , ("{{tracker}}", postHogTracker)
+                , ("{{version}}", wrenchVersion)
+                ]
+    return $ toHtmlRaw rendered
+
+readExamplesIndex :: FilePath -> IO [ExampleEntry]
+readExamplesIndex examplesPath = do
+    let indexFn = examplesPath </> "index.json"
+    exists <- doesFileExist indexFn
+    if not exists
+        then return []
+        else do
+            raw <- readFileBS indexFn
+            case eitherDecodeStrict raw of
+                Right entries -> return entries
+                Left err -> do
+                    putStrLn $ "Failed to parse " <> indexFn <> ": " <> err
+                    return []
+
+renderExamplesList :: [ExampleEntry] -> Text
+renderExamplesList [] =
+    "<p class=\"text-[var(--c-grey)]\">No examples available.</p>"
+renderExamplesList entries =
+    T.concat $ map renderGroup $ groupByIsa $ sortWith (\e -> (eeIsa e, eeTitle e)) entries
+
+groupByIsa :: [ExampleEntry] -> [(Text, [ExampleEntry])]
+groupByIsa = foldr step []
+    where
+        step e [] = [(eeIsa e, [e])]
+        step e (g@(isa, es) : rest)
+            | eeIsa e == isa = (isa, e : es) : rest
+            | otherwise = (eeIsa e, [e]) : g : rest
+
+renderGroup :: (Text, [ExampleEntry]) -> Text
+renderGroup (isa, items) =
+    "<div class=\"mb-8\">"
+        <> "<h2 class=\"mb-3 pb-1 border-b border-zinc-700 text-[var(--c-grey)] text-xl\">/* "
+        <> escapeHtml isa
+        <> " */</h2>"
+        <> "<ul class=\"space-y-1\">"
+        <> T.concat (map renderItem items)
+        <> "</ul>"
+        <> "</div>"
+
+renderItem :: ExampleEntry -> Text
+renderItem ExampleEntry{eeGuid, eeTitle, eeDescription, eeOk} =
+    let (statusClass, statusLabel) =
+            if eeOk
+                then ("text-[var(--c-green)]", "ok")
+                else ("text-[var(--c-orange)]", "fail")
+        descHtml
+            | T.null eeDescription = ""
+            | otherwise =
+                "<div class=\"w-full pl-[3ch] text-[var(--c-grey)] text-sm\">"
+                    <> escapeHtml eeDescription
+                    <> "</div>"
+     in "<li class=\"flex flex-wrap items-baseline gap-x-2\">"
+            <> "<span class=\""
+            <> statusClass
+            <> "\">["
+            <> statusLabel
+            <> "]</span>"
+            <> "<a href=\"/report/"
+            <> escapeHtml eeGuid
+            <> "\" class=\"hover:bg-[var(--c-fuschia)] pt-[0.2ch] pb-[0.2ch] text-[var(--c-fuschia)] hover:text-[var(--c-black)] cursor-pointer\">["
+            <> escapeHtml eeTitle
+            <> "]</a>"
+            <> descHtml
+            <> "</li>"
 
 redirectToForm :: Handler (Headers '[Header "Location" Text] NoContent)
 redirectToForm = throwError $ err301{errHeaders = [("Location", "/submit-form")]}
