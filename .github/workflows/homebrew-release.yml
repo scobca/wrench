@@ -1,0 +1,13 @@
+name: Homebrew CI
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  publish-to-homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger homebrew deployment
+        run: |
+          echo "Publishing"
