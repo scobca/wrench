@@ -1,5 +1,6 @@
 import hashlib
 import argparse
+
 import requests
 
 """Download file and check it SHA256."""
@@ -19,6 +20,11 @@ def download_and_calculate_sha256(url: str) -> str:
 
 """Generate Homebrew Formula from source files"""
 
+def normalize_version(version: str) -> str:
+    """Normalize version string by removing refs/tags/ prefix."""
+    version = version.replace("refs/tags/", "")
+    version = version.lstrip("v")
+    return version
 
 def generate_formula(
         version: str,
@@ -100,7 +106,8 @@ def main():
 
     args = parser.parse_args()
 
-    source_url = f"{args.repo}/archive/refs/tags/{args.version}.tar.gz"
+    repo = args.repo.replace("https://github.com/", "").rstrip("/")
+    source_url = f"https://github.com/{repo}/archive/refs/tags/{args.version}.tar.gz"
 
     if args.skip_download and args.sha256:
         sha256 = args.sha256

@@ -16,7 +16,8 @@ jobs:
       - name: Get version from tag
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=$(basename $GITHUB_REF)
+          VERSION=${VERSION#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup Python
@@ -31,7 +32,7 @@ jobs:
       - name: Generate Homebrew formula from source
         run: |
           python script/generate_homebrew_formula.py \
-            --repo ${{secrets.HOMEBREW_TAP_REPOSITORY}}
+            --repo ${{ github.repository }} \
             --version ${{ steps.version.outputs.version }} \
             --output wrench.rb
           
@@ -51,11 +52,6 @@ jobs:
         run: |
           cd tap
           cp ../wrench.rb .
-          
-          if git diff --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
           
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
