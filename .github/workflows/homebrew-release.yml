@@ -53,11 +53,6 @@ jobs:
           cd tap
           cp ../wrench.rb .
           
-          if git diff --quiet && git ls-files --others --exclude-standard | grep -q .; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add wrench.rb
