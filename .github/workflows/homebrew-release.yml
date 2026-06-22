@@ -7,7 +7,80 @@ on:
 jobs:
   publish-to-homebrew:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Trigger homebrew deployment
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Get version from tag
+        id: version
         run: |
-          echo "Publishing"
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install requests
+
+      - name: Generate Homebrew formula from source
+        run: |
+          python script/generate_homebrew_formula.py \
+            --version ${{ steps.version.outputs.version }} \
+            --output wrench.rb
+          
+      - name: Show generated formula
+        run: |
+          echo "Generated formula:"
+          cat wrench.rb
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ secrets.HOMEBREW_TAP_REPOSITORY }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula in tap
+        run: |
+          cd tap
+          cp ../wrench.rb .
+          
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add wrench.rb
+          git commit -m "Update wrench to version ${{ steps.version.outputs.version }}"
+          git push origin main
+          
+          echo "Updated tap repository"
+
+  test_formula:
+    needs: publish-to-homebrew
+    steps:
+      - name: Test formula installation (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew tap scobca/wrench || true
+          brew install --build-from-source wrench || true
+          wrench --version || true
+
+      - name: Test formula installation (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo "Testing installation on Linux..."
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+          brew tap scobca/wrench || true
+          brew install --build-from-source wrench || true
+          wrench --version || true
