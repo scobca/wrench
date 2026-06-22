@@ -21,6 +21,11 @@ def download_and_calculate_sha256(url: str) -> str:
 
 """Generate Homebrew Formula from source files"""
 
+def normalize_version(version: str) -> str:
+    """Normalize version string by removing refs/tags/ prefix."""
+    version = version.replace("refs/tags/", "")
+    version = version.lstrip("v")
+    return version
 
 def generate_formula(
         version: str,
