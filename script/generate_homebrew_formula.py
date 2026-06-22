@@ -1,6 +1,5 @@
 import hashlib
 import argparse
-from xml.sax.handler import version
 
 import requests
 
