@@ -34,7 +34,7 @@ def generate_formula(
     class Wrench < Formula
       desc "{description}"
       homepage "{repo}"
-      url "{repo}/archive/refs/tags/{version}.tar.gz"
+      url "https://github.com/{repo}/archive/refs/tags/{version}.tar.gz"
       sha256 "{source_sha256}"
       license "{license}"
     
@@ -65,7 +65,7 @@ def main():
 
     parser.add_argument(
         "--repo",
-        default="https://github.com/ryukzak/wrench",
+        required=True,
         help="Repository URL"
     )
 
