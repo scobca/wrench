@@ -1,4 +1,5 @@
 name: Homebrew CI
+
 on:
   release:
     types:
@@ -64,6 +65,7 @@ jobs:
           echo "Updated tap repository"
 
   test_formula:
+    runs-on: ubuntu-latest
     needs: publish-to-homebrew
     steps:
       - name: Test formula installation (macOS)
