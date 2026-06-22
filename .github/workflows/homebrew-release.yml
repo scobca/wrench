@@ -1,6 +1,6 @@
 name: Homebrew CI
 
-runs-on:
+on:
   release:
     types:
       - published
