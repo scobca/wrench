@@ -32,7 +32,7 @@ jobs:
       - name: Generate Homebrew formula from source
         run: |
           python script/generate_homebrew_formula.py \
-            --repo ${{secrets.HOMEBREW_TAP_REPOSITORY}} \
+            --repo ${{ github.repository }} \
             --version ${{ steps.version.outputs.version }} \
             --output wrench.rb
           
