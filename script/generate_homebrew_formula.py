@@ -80,22 +80,21 @@ def generate_formula(
 ) -> str:
     """Generate Homebrew formula with bottle block."""
 
-    # Сортируем ассеты для стабильного порядка
     sorted_assets = sorted(bottle_assets.items())
-
-    # Формируем строки для bottle блока (НОВЫЙ СИНТАКСИС)
     bottle_lines = []
     for asset_name, url in sorted_assets:
         bottle_key = get_bottle_key(asset_name)
-        if bottle_key:
+        if bottle_key and bottle_key != 'windows':
             try:
                 sha256 = download_and_calculate_sha256(url)
-                bottle_lines.append(f'    sha256 cellar: :any_skip_relocation, {bottle_key}: "{sha256}"')
+                bottle_lines.append(f'    url "{asset_name}" => :{bottle_key}')
+                bottle_lines.append(f'    sha256 "{sha256}" => :{bottle_key}')
                 print(f"Added bottle for {asset_name} -> :{bottle_key}")
             except Exception as e:
                 print(f"Error downloading {url}: {e}")
                 continue
 
+    # Create bottle block
     if bottle_lines:
         bottle_block = f'''
   bottle do
