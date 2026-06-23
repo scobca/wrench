@@ -13,12 +13,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Get version from tag
-        id: version
-        run: |
-          VERSION=$(basename $GITHUB_REF)
-          VERSION=${VERSION#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Get release info and assets
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: context.ref.replace('refs/tags/', '')
+            });
+            
+            const assets = release.data.assets.map(a => a.name);
+            const version = release.data.tag_name.replace(/^v/, '');
+            
+            console.log('Assets:', assets);
+            console.log('Version:', version);
+            
+            return {
+              version: version,
+              assets: assets
+            };
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,11 +44,12 @@ jobs:
         run: |
           pip install requests
 
-      - name: Generate Homebrew formula from source
+      - name: Generate Homebrew formula
         run: |
           python script/generate_homebrew_formula.py \
             --repo ${{ github.repository }} \
-            --version ${{ steps.version.outputs.version }} \
+            --version ${{ steps.release.outputs.version }} \
+            --assets '${{ toJSON(steps.release.outputs.assets) }}' \
             --output wrench.rb
           
       - name: Show generated formula
@@ -56,25 +72,16 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add wrench.rb
-          git commit -m "Update wrench to version ${{ steps.version.outputs.version }}"
+          git commit -m "Update wrench to version ${{ steps.release.outputs.version }} with bottles"
           git push origin main
           
           echo "Updated tap repository"
 
-  test_formula:
+  test_formula_linux:
     runs-on: ubuntu-latest
     needs: publish-to-homebrew
     steps:
-      - name: Test formula installation (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew tap ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
-          brew trust ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
-          brew install --build-from-source wrench || true
-          wrench --version || true
-
       - name: Test formula installation (Linux)
-        if: runner.os == 'Linux'
         run: |
           echo "Testing installation on Linux..."
           if ! command -v brew &> /dev/null; then
@@ -83,5 +90,16 @@ jobs:
           fi
           brew tap ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
           brew trust ${{ secrets.HOMEBREW_TAP_REPOSITORY }}
-          brew install --build-from-source wrench || true
+          brew install wrench || true
+          wrench --version || true
+
+  test_formula_macOS:
+    runs-on: ubuntu-latest
+    needs: publish-to-homebrew
+    steps:
+      - name: Test formula installation (macOS)
+        run: |
+          brew tap ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
+          brew trust ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
+          brew install wrench || true
           wrench --version || true
