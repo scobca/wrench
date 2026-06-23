@@ -149,6 +149,12 @@ jobs:
           name: wrench-${{ runner.os }}-${{ runner.arch }}
           path: wrench-${{ runner.os }}-${{ runner.arch }}.tar.gz
 
+      - name: Build bottle archives
+        run: |
+          VERSION=$(basename $GITHUB_REF)
+          VERSION=${VERSION#v}
+          python script/build_bottles.py $VERSION
+
   publish-release:
     needs:
       - build-binaries
@@ -165,79 +171,6 @@ jobs:
           merge-multiple: true
 
       - run: find ./release/
-
-      - name: Create Homebrew bottle archives
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}
-          echo "Creating bottle archives for version: $VERSION"
-          
-          cd release
-          
-          mkdir -p bottle_archives
-          
-          for archive in wrench-*.tar.gz; do
-            if [[ "$archive" == *"Windows"* ]]; then
-              echo "Skipping Windows archive: $archive"
-              continue
-            fi
-          
-            echo "Creating bottle from $archive..."
-          
-            mkdir -p temp_extract
-            cd temp_extract
-          
-            tar -xzf ../"$archive"
-          
-            mkdir -p wrench/$VERSION
-          
-            for file in *; do
-              if [ "$file" != "wrench" ]; then
-                mv "$file" wrench/$VERSION/ 2>/dev/null || true
-              fi
-            done
-          
-            if [ -d "wrench" ] && [ "$(ls -A wrench)" ]; then
-              if [ ! -d "wrench/$VERSION" ]; then
-                mkdir -p wrench/$VERSION
-                for file in wrench/*; do
-                  if [ "$file" != "wrench/$VERSION" ]; then
-                    mv "$file" wrench/$VERSION/ 2>/dev/null || true
-                  fi
-                done
-              fi
-            fi
-          
-            echo "Bottle structure:"
-            find wrench -type f
-          
-            bottle_name=""
-            if [[ "$archive" == *"macOS-ARM64"* ]]; then
-              bottle_name="wrench-${VERSION}.arm64_ventura.bottle.tar.gz"
-            elif [[ "$archive" == *"Linux-ARM64"* ]]; then
-              bottle_name="wrench-${VERSION}.arm64_linux.bottle.tar.gz"
-            elif [[ "$archive" == *"Linux-X64"* ]]; then
-              bottle_name="wrench-${VERSION}.x86_64_linux.bottle.tar.gz"
-            else
-              echo "Unknown platform for $archive, skipping..."
-              cd ..
-              rm -rf temp_extract
-              continue
-            fi
-          
-            tar -czf "../bottle_archives/$bottle_name" wrench/
-          
-            cd ..
-            rm -rf temp_extract
-          
-            echo "Done: Created $bottle_name"
-          done
-          
-          mv bottle_archives/* ./
-          rm -rf bottle_archives
-          
-          echo "Final files in release directory:"
-          ls -la
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
