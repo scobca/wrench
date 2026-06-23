@@ -149,16 +149,6 @@ jobs:
           name: wrench-${{ runner.os }}-${{ runner.arch }}
           path: wrench-${{ runner.os }}-${{ runner.arch }}.tar.gz
 
-      - name: Create bottle symlinks
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}
-
-          ln -s wrench-macOS-ARM64.tar.gz "wrench-${VERSION}.arm64_ventura.bottle.tar.gz"
-          ln -s wrench-Linux-ARM64.tar.gz "wrench-${VERSION}.arm64_linux.bottle.tar.gz"
-          ln -s wrench-Linux-X64.tar.gz "wrench-${VERSION}.x86_64_linux.bottle.tar.gz"
-
   publish-release:
     needs:
       - build-binaries
@@ -175,6 +165,19 @@ jobs:
           merge-multiple: true
 
       - run: find ./release/
+
+      - name: Create Homebrew bottle symlinks
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          echo "Creating symlinks for version: $VERSION"
+          
+          cd release
+          
+          ln -sf wrench-macOS-ARM64.tar.gz "wrench-${VERSION}.arm64_ventura.bottle.tar.gz"
+          ln -sf wrench-Linux-ARM64.tar.gz "wrench-${VERSION}.arm64_linux.bottle.tar.gz"
+          ln -sf wrench-Linux-X64.tar.gz "wrench-${VERSION}.x86_64_linux.bottle.tar.gz"
+          ln -sf wrench-Windows-X64.tar.gz "wrench-${VERSION}.windows.bottle.tar.gz"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
