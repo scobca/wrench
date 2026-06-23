@@ -13,27 +13,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Get release info and assets
-        id: release
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=$(basename $GITHUB_REF)
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get release assets
+        id: assets
         uses: actions/github-script@v7
         with:
+          result-encoding: string
           script: |
+            const tag = context.ref.replace('refs/tags/', '');
             const release = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag: context.ref.replace('refs/tags/', '')
+              tag,
             });
-            
-            const assets = release.data.assets.map(a => a.name);
-            const version = release.data.tag_name.replace(/^v/, '');
-            
-            console.log('Assets:', assets);
-            console.log('Version:', version);
-            
-            return {
-              version: version,
-              assets: assets
-            };
+
+            return JSON.stringify(release.data.assets.map(a => a.name));
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -48,10 +48,10 @@ jobs:
         run: |
           python script/generate_homebrew_formula.py \
             --repo ${{ github.repository }} \
-            --version ${{ steps.release.outputs.version }} \
-            --assets '${{ toJSON(steps.release.outputs.assets) }}' \
+            --version ${{ steps.version.outputs.version }} \
+            --assets '${{ steps.assets.outputs.result }}' \
             --output wrench.rb
-          
+
       - name: Show generated formula
         run: |
           echo "Generated formula:"
