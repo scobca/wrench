@@ -94,7 +94,7 @@ jobs:
           wrench --version || true
 
   test_formula_macOS:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: publish-to-homebrew
     steps:
       - name: Test formula installation (macOS)

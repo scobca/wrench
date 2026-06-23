@@ -2,8 +2,7 @@ import hashlib
 import argparse
 import requests
 import json
-import re
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 def download_and_calculate_sha256(url: str) -> str:
     """Download file and calculate its SHA256."""
@@ -81,14 +80,17 @@ def generate_formula(
 ) -> str:
     """Generate Homebrew formula with bottle block."""
 
+    # Сортируем ассеты для стабильного порядка
     sorted_assets = sorted(bottle_assets.items())
+
+    # Формируем строки для bottle блока (НОВЫЙ СИНТАКСИС)
     bottle_lines = []
     for asset_name, url in sorted_assets:
         bottle_key = get_bottle_key(asset_name)
         if bottle_key:
             try:
                 sha256 = download_and_calculate_sha256(url)
-                bottle_lines.append(f'    sha256 "{sha256}" => :{bottle_key}')
+                bottle_lines.append(f'    sha256 cellar: :any_skip_relocation, {bottle_key}: "{sha256}"')
                 print(f"Added bottle for {asset_name} -> :{bottle_key}")
             except Exception as e:
                 print(f"Error downloading {url}: {e}")
