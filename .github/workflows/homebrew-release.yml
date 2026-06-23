@@ -68,7 +68,8 @@ jobs:
       - name: Test formula installation (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew tap scobca/wrench || true
+          brew tap ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
+          brew trust ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
           brew install --build-from-source wrench || true
           wrench --version || true
 
@@ -80,6 +81,7 @@ jobs:
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
-          brew tap scobca/wrench || true
+          brew tap ${{ secrets.HOMEBREW_TAP_REPOSITORY }} || true
+          brew trust ${{ secrets.HOMEBREW_TAP_REPOSITORY }}
           brew install --build-from-source wrench || true
           wrench --version || true
