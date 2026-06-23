@@ -162,7 +162,6 @@ def main():
         repo=repo,
         description=args.description,
         license=args.license,
-        bottle_assets=bottle_assets,
         source_sha256=source_sha256
     )
 
