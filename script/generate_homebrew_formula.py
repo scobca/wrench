@@ -2,8 +2,8 @@ import hashlib
 import argparse
 import requests
 import json
-from typing import Dict, List
-
+import re
+from typing import Dict, List, Optional
 
 def download_and_calculate_sha256(url: str) -> str:
     """Download file and calculate its SHA256."""
@@ -11,12 +11,14 @@ def download_and_calculate_sha256(url: str) -> str:
     response.raise_for_status()
 
     sha256_hash = hashlib.sha256()
+    total_size = 0
     for chunk in response.iter_content(chunk_size=8192):
         if chunk:
             sha256_hash.update(chunk)
+            total_size += len(chunk)
 
+    print(f"Downloaded {total_size} bytes from {url}")
     return sha256_hash.hexdigest()
-
 
 def normalize_version(version: str) -> str:
     """Normalize version string by removing refs/tags/ prefix."""
@@ -24,12 +26,50 @@ def normalize_version(version: str) -> str:
     version = version.lstrip("v")
     return version
 
+def get_bottle_key(asset_name: str) -> Optional[str]:
+    """
+    Convert asset filename to Homebrew bottle key.
 
-def get_asset_urls(repo: str, version: str, assets: List[str]) -> Dict[str, str]:
-    """Get download URLs for assets from GitHub release."""
-    base_url = f"https://github.com/{repo}/releases/download/{version}"
-    return {asset: f"{base_url}/{asset}" for asset in assets}
+    Examples:
+    - wrench-Linux-ARM64.tar.gz -> arm64_linux
+    - wrench-Linux-X64.tar.gz -> x86_64_linux
+    - wrench-macOS-ARM64.tar.gz -> arm64_ventura
+    - wrench-Windows-X64.tar.gz -> None (Windows not supported)
+    """
+    base_name = asset_name.replace('.tar.gz', '')
+    parts = base_name.split('-')
 
+    if len(parts) < 3:
+        print(f"Warning: Cannot parse asset name: {asset_name}")
+        return None
+
+    # parts[0] = "wrench", parts[1] = OS, parts[2] = ARCH
+    os_name = parts[1].lower()
+    arch = parts[2].lower()
+
+    if os_name == 'windows':
+        print(f"Skipping Windows asset: {asset_name}")
+        return None
+
+    if os_name == 'macos':
+        if arch == 'arm64':
+            return 'arm64_ventura'
+        elif arch == 'x64':
+            return 'x86_64'
+        else:
+            print(f"Unknown macOS arch: {arch}")
+            return None
+    elif os_name == 'linux':
+        if arch == 'arm64':
+            return 'arm64_linux'
+        elif arch == 'x64':
+            return 'x86_64_linux'
+        else:
+            print(f"Unknown Linux arch: {arch}")
+            return None
+    else:
+        print(f"Unknown OS: {os_name}")
+        return None
 
 def generate_formula(
         version: str,
@@ -37,36 +77,33 @@ def generate_formula(
         description: str,
         license: str,
         bottle_assets: Dict[str, str],
-        source_sha256: str = None
+        source_sha256: str
 ) -> str:
     """Generate Homebrew formula with bottle block."""
 
-    """Create bottle block for fast installation from builds"""
+    sorted_assets = sorted(bottle_assets.items())
     bottle_lines = []
-    for asset_name, url in bottle_assets.items():
-        parts = asset_name.replace('.tar.gz', '').split('-')
-        if len(parts) >= 3:
-            os_name = parts[1].lower()
-            arch = parts[2].lower()
-
-            if arch == 'arm64' and os_name == 'macos':
-                bottle_key = 'arm64_ventura'
-            elif arch == 'x64' and os_name == 'linux':
-                bottle_key = 'x86_64_linux'
-            elif arch == 'arm64' and os_name == 'linux':
-                bottle_key = 'arm64_linux'
-            elif arch == 'x64' and os_name == 'windows':
-                bottle_key = 'x86_64'
-
-            if os_name != 'windows':
+    for asset_name, url in sorted_assets:
+        bottle_key = get_bottle_key(asset_name)
+        if bottle_key:
+            try:
                 sha256 = download_and_calculate_sha256(url)
                 bottle_lines.append(f'    sha256 "{sha256}" => :{bottle_key}')
+                print(f"Added bottle for {asset_name} -> :{bottle_key}")
+            except Exception as e:
+                print(f"Error downloading {url}: {e}")
+                continue
 
-    bottle_block = f'''
+    if bottle_lines:
+        bottle_block = f'''
   bottle do
     root_url "{f"https://github.com/{repo}/releases/download/{version}"}"
-{bottle_lines[0] if bottle_lines else "    # No bottles available"}
+{chr(10).join(bottle_lines)}
   end
+'''
+    else:
+        bottle_block = '''
+  # No bottles available for this platform
 '''
 
     formula = f'''
@@ -95,7 +132,6 @@ end
 '''
     return formula
 
-
 def main():
     parser = argparse.ArgumentParser(description="Generate Homebrew formula from source")
 
@@ -117,16 +153,22 @@ def main():
         source_sha256 = args.source_sha256
     else:
         source_sha256 = download_and_calculate_sha256(source_url)
+        print(f"Source SHA256: {source_sha256}")
 
     assets = []
     if args.assets:
-        assets = json.loads(args.assets)
+        try:
+            assets = json.loads(args.assets)
+            print(f"Parsed {len(assets)} assets")
+        except json.JSONDecodeError as e:
+            print(f"Error parsing assets JSON: {e}")
+            assets = []
 
     bottle_assets = {}
     if assets:
         base_url = f"https://github.com/{repo}/releases/download/{version}"
         for asset in assets:
-            if asset.endswith('.tar.gz') and 'Source' not in asset:
+            if 'Source' not in asset and asset.endswith('.tar.gz'):
                 bottle_assets[asset] = f"{base_url}/{asset}"
 
     formula = generate_formula(
